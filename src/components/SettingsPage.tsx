@@ -54,8 +54,12 @@ const settingsItems = [
 ];
 
 export function SettingsPage({ onEditProfile }: SettingsPageProps) {
-  const { currentUser, logout } = useAuth();
+  const { profile, signOut } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(true);
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
@@ -77,17 +81,17 @@ export function SettingsPage({ onEditProfile }: SettingsPageProps) {
           className="w-full flex items-center gap-4 p-4 rounded-xl bg-card border border-border/50 hover:bg-card-hover transition-all"
         >
           <Avatar
-            src={currentUser?.avatar}
-            name={currentUser?.name}
+            src={profile?.avatar_url || undefined}
+            name={profile?.name}
             size="lg"
             showStatus={false}
           />
           <div className="flex-1 text-left">
             <h2 className="font-display font-semibold text-lg text-foreground">
-              {currentUser?.name || 'Your Name'}
+              {profile?.name || 'Your Name'}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {currentUser?.description || 'Hey there! I am using ZursApp'}
+              {profile?.description || 'Hey there! I am using ZursApp'}
             </p>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -157,7 +161,7 @@ export function SettingsPage({ onEditProfile }: SettingsPageProps) {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 h-14 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-            onClick={logout}
+            onClick={handleLogout}
           >
             <LogOut className="w-5 h-5" />
             Log Out

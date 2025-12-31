@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
-import { useSupabaseAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { ChatProvider } from '@/context/ChatContext';
 import { AuthPage } from '@/pages/AuthPage';
 import { ChatDashboard } from '@/components/ChatDashboard';
+import { ChatRoom } from '@/components/ChatRoom';
 import { StatusPage } from '@/components/StatusPage';
 import { CallsPage } from '@/components/CallsPage';
 import { SettingsPage } from '@/components/SettingsPage';
+import { AdminPanel } from '@/components/AdminPanel';
+import { AddContactModal } from '@/components/AddContactModal';
+import { CreateGroupModal } from '@/components/CreateGroupModal';
+import { CreateStatusModal } from '@/components/CreateStatusModal';
+import { StatusViewer } from '@/components/StatusViewer';
+import { EditProfileModal } from '@/components/EditProfileModal';
 import { BottomNav } from '@/components/BottomNav';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useChats, type ChatType } from '@/hooks/useChats';
+import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 
-type View = 'chats' | 'status' | 'calls' | 'settings';
+type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
 
 function LoadingScreen() {
   return (
@@ -26,15 +35,28 @@ function LoadingScreen() {
 }
 
 function AppContent() {
-  const { user, loading } = useSupabaseAuth();
+  const { user, profile, loading, isAdmin } = useAuth();
+  const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
+  const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
+  
   const [currentView, setCurrentView] = useState<View>('chats');
   const [activeNavIndex, setActiveNavIndex] = useState(0);
+  const [selectedChat, setSelectedChat] = useState<ChatType | null>(null);
+  const [selectedUserStatuses, setSelectedUserStatuses] = useState<StatusType[]>([]);
+
+  // Modal states
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showCreateStatus, setShowCreateStatus] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showStatusViewer, setShowStatusViewer] = useState(false);
 
   const navItems = [
     { icon: MessageCircle, label: 'Chats', path: 'chats' },
     { icon: Radio, label: 'Status', path: 'status' },
     { icon: Phone, label: 'Calls', path: 'calls' },
     { icon: Settings, label: 'Settings', path: 'settings' },
+    ...(isAdmin ? [{ icon: Shield, label: 'Admin', path: 'admin' }] : []),
   ];
 
   if (loading) {
@@ -47,33 +69,140 @@ function AppContent() {
 
   const handleNavigate = (index: number) => {
     setActiveNavIndex(index);
-    setCurrentView(navItems[index].path as View);
+    const path = navItems[index].path as View;
+    setCurrentView(path);
+    setSelectedChat(null);
+  };
+
+  const handleChatSelect = (chat: ChatType) => {
+    setSelectedChat(chat);
+    setCurrentView('chatroom');
+  };
+
+  const handleBackFromChat = () => {
+    setSelectedChat(null);
+    setCurrentView('chats');
+    setActiveNavIndex(0);
+  };
+
+  const handleViewStatus = (userStatuses: StatusType[]) => {
+    setSelectedUserStatuses(userStatuses);
+    setShowStatusViewer(true);
+    userStatuses.forEach(status => {
+      viewStatus(status.id);
+    });
+  };
+
+  const handleCreateChat = async (otherUserId: string) => {
+    const { data } = await createPrivateChat(otherUserId);
+    if (data) {
+      setSelectedChat(data as ChatType);
+      setCurrentView('chatroom');
+    }
+    setShowAddContact(false);
+  };
+
+  const handleCreateGroup = async (name: string, participantIds: string[]) => {
+    const { data } = await createGroupChat(name, participantIds);
+    if (data) {
+      setSelectedChat(data as ChatType);
+      setCurrentView('chatroom');
+    }
+    setShowCreateGroup(false);
+  };
+
+  const handleCreateStatus = async (
+    type: 'text' | 'image' | 'video',
+    content: string,
+    options?: any
+  ) => {
+    await createStatus(type, content, options);
+    setShowCreateStatus(false);
   };
 
   return (
     <div className="min-h-screen bg-background">
       {currentView === 'chats' && (
         <ChatDashboard
-          onChatSelect={() => {}}
-          onAddContact={() => {}}
-          onAddGroup={() => {}}
-          onAddChannel={() => {}}
+          chats={chats}
+          onChatSelect={handleChatSelect}
+          onAddContact={() => setShowAddContact(true)}
+          onAddGroup={() => setShowCreateGroup(true)}
+          onAddChannel={() => setShowCreateGroup(true)}
           onSettings={() => handleNavigate(3)}
         />
       )}
 
+      {currentView === 'chatroom' && selectedChat && (
+        <ChatRoom
+          chat={selectedChat}
+          userId={user.id}
+          onBack={handleBackFromChat}
+          onCall={() => {}}
+          onVideoCall={() => {}}
+          onInfo={() => {}}
+        />
+      )}
+
       {currentView === 'status' && (
-        <StatusPage onViewStatus={() => {}} onCreateStatus={() => {}} />
+        <StatusPage
+          myStatuses={myStatuses}
+          contactStatuses={contactStatuses}
+          profile={profile}
+          onViewStatus={handleViewStatus}
+          onCreateStatus={() => setShowCreateStatus(true)}
+        />
       )}
 
       {currentView === 'calls' && <CallsPage onCall={() => {}} />}
 
-      {currentView === 'settings' && <SettingsPage onEditProfile={() => {}} />}
+      {currentView === 'settings' && (
+        <SettingsPage onEditProfile={() => setShowEditProfile(true)} />
+      )}
 
-      <BottomNav
-        items={navItems}
-        activeIndex={activeNavIndex}
-        onNavigate={handleNavigate}
+      {currentView === 'admin' && isAdmin && (
+        <AdminPanel userId={user.id} onBack={() => handleNavigate(0)} />
+      )}
+
+      {currentView !== 'chatroom' && currentView !== 'admin' && (
+        <BottomNav
+          items={navItems}
+          activeIndex={activeNavIndex}
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {/* Modals */}
+      <AddContactModal
+        isOpen={showAddContact}
+        onClose={() => setShowAddContact(false)}
+        userId={user.id}
+        onCreateChat={handleCreateChat}
+      />
+
+      <CreateGroupModal
+        isOpen={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+        userId={user.id}
+        onCreateGroup={handleCreateGroup}
+      />
+
+      <CreateStatusModal
+        isOpen={showCreateStatus}
+        onClose={() => setShowCreateStatus(false)}
+        onCreateStatus={handleCreateStatus}
+      />
+
+      <EditProfileModal
+        isOpen={showEditProfile}
+        onClose={() => setShowEditProfile(false)}
+      />
+
+      <StatusViewer
+        isOpen={showStatusViewer}
+        onClose={() => setShowStatusViewer(false)}
+        statuses={selectedUserStatuses}
+        onView={viewStatus}
       />
     </div>
   );
