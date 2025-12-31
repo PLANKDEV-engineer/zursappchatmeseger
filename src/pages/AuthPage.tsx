@@ -1,156 +1,130 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, ArrowRight, Loader2, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/Logo';
-import { CountryPicker } from '@/components/CountryPicker';
-import { OtpInput } from '@/components/OtpInput';
-import { Avatar } from '@/components/Avatar';
-import { countries } from '@/data/countries';
-import { Country } from '@/types';
-import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from '@/hooks/useAuth';
+
+type AuthStep = 'choice' | 'login' | 'signup' | 'profile';
 
 export function AuthPage() {
-  const { authState, setAuthState, setCurrentUser } = useAuth();
   const { toast } = useToast();
-  const [selectedCountry, setSelectedCountry] = useState<Country>(countries[0]);
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
+  const { signIn, signUp, updateProfile } = useSupabaseAuth();
+  
+  const [step, setStep] = useState<AuthStep>('choice');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [avatar, setAvatar] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState('');
-  const [countdown, setCountdown] = useState(0);
 
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [countdown]);
-
-  const generateOtp = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const handleSendOtp = async () => {
-    if (!phone || phone.length < 8) {
+  const handleLogin = async () => {
+    if (!email || !password) {
       toast({
-        title: 'Invalid Number',
-        description: 'Please enter a valid phone number',
+        title: 'Missing Fields',
+        description: 'Please enter your email and password',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address',
         variant: 'destructive',
       });
       return;
     }
 
     setIsLoading(true);
-    const newOtp = generateOtp();
-    setGeneratedOtp(newOtp);
-
-    // Simulate SMS sending delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
+    const { error } = await signIn(email, password);
     setIsLoading(false);
-    setCountdown(60);
-    setAuthState((prev) => ({
-      ...prev,
-      step: 'otp',
-      phone,
-      countryCode: selectedCountry.dialCode,
-    }));
 
-    toast({
-      title: 'Verification Code Sent!',
-      description: `Code: ${newOtp} (Demo mode - normally sent via SMS)`,
-    });
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otp.length !== 6) {
+    if (error) {
       toast({
-        title: 'Invalid Code',
-        description: 'Please enter the 6-digit verification code',
+        title: 'Login Failed',
+        description: error.message === 'Invalid login credentials' 
+          ? 'Email or password is incorrect' 
+          : error.message,
         variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    if (otp === generatedOtp) {
-      setIsLoading(false);
-      setAuthState((prev) => ({ ...prev, step: 'profile', otpCode: otp }));
-      toast({
-        title: 'Verified!',
-        description: 'Phone number verified successfully',
       });
     } else {
-      setIsLoading(false);
       toast({
-        title: 'Invalid Code',
-        description: 'The verification code is incorrect',
-        variant: 'destructive',
+        title: 'Welcome Back!',
+        description: 'Successfully logged in',
       });
     }
   };
 
-  const handleCompleteProfile = async () => {
-    if (!name.trim()) {
+  const handleSignup = async () => {
+    if (!email || !password || !name) {
       toast({
-        title: 'Name Required',
-        description: 'Please enter your name',
+        title: 'Missing Fields',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: 'Weak Password',
+        description: 'Password must be at least 6 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: 'Password Mismatch',
+        description: 'Passwords do not match',
         variant: 'destructive',
       });
       return;
     }
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const newUser = {
-      id: crypto.randomUUID(),
-      phone: `${selectedCountry.dialCode}${phone}`,
-      countryCode: selectedCountry.dialCode,
-      name: name.trim(),
-      avatar: avatar || undefined,
-      description: description.trim() || undefined,
-      isOnline: true,
-      createdAt: new Date(),
-    };
-
-    setCurrentUser(newUser);
-    setAuthState((prev) => ({ ...prev, step: 'complete', user: newUser }));
+    const { error } = await signUp(email, password, name);
     setIsLoading(false);
 
-    toast({
-      title: 'Welcome to ZursApp!',
-      description: 'Your account has been created successfully',
-    });
-  };
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setAvatar(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (error) {
+      if (error.message.includes('already registered')) {
+        toast({
+          title: 'Account Exists',
+          description: 'This email is already registered. Please login instead.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Signup Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
+    } else {
+      toast({
+        title: 'Welcome to ZursApp!',
+        description: 'Your account has been created successfully',
+      });
     }
-  };
-
-  const handleResendOtp = () => {
-    const newOtp = generateOtp();
-    setGeneratedOtp(newOtp);
-    setCountdown(60);
-    toast({
-      title: 'Code Resent!',
-      description: `New code: ${newOtp} (Demo mode)`,
-    });
   };
 
   const pageVariants = {
@@ -169,16 +143,11 @@ export function AuthPage() {
 
       {/* Header */}
       <header className="relative z-10 p-6 flex items-center justify-between">
-        {authState.step !== 'phone' && (
+        {step !== 'choice' && (
           <Button
             variant="ghost"
             size="icon"
-            onClick={() =>
-              setAuthState((prev) => ({
-                ...prev,
-                step: prev.step === 'profile' ? 'otp' : 'phone',
-              }))
-            }
+            onClick={() => setStep('choice')}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -186,236 +155,274 @@ export function AuthPage() {
         <div className="flex-1 flex justify-center">
           <Logo size="lg" />
         </div>
-        {authState.step !== 'phone' && <div className="w-10" />}
+        {step !== 'choice' && <div className="w-10" />}
       </header>
 
       {/* Content */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 pb-20">
-        {/* Phone Step */}
-        {authState.step === 'phone' && (
-          <motion.div
-            key="phone"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="w-full max-w-md space-y-8"
-          >
-            <div className="text-center space-y-2">
-              <h1 className="text-3xl font-display font-bold text-gradient-primary">
-                Enter Your Phone Number
-              </h1>
-              <p className="text-muted-foreground">
-                We'll send you a verification code via SMS
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex gap-3">
-                <CountryPicker
-                  selected={selectedCountry}
-                  onSelect={setSelectedCountry}
-                />
-                <Input
-                  type="tel"
-                  placeholder="Phone number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                  variant="glow"
-                  className="flex-1"
-                />
+        <AnimatePresence mode="wait">
+          {/* Choice Step */}
+          {step === 'choice' && (
+            <motion.div
+              key="choice"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full max-w-md space-y-8"
+            >
+              <div className="text-center space-y-4">
+                <h1 className="text-4xl font-display font-bold text-gradient-primary">
+                  Welcome to ZursApp
+                </h1>
+                <p className="text-muted-foreground text-lg">
+                  The next generation messaging platform
+                </p>
               </div>
 
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                onClick={handleSendOtp}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    Continue
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </Button>
-            </div>
+              <div className="space-y-4 pt-8">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  onClick={() => setStep('login')}
+                >
+                  <Mail className="w-5 h-5 mr-2" />
+                  Login with Email
+                </Button>
 
-            <p className="text-center text-sm text-muted-foreground">
-              By continuing, you agree to our{' '}
-              <span className="text-primary cursor-pointer hover:underline">
-                Terms of Service
-              </span>{' '}
-              and{' '}
-              <span className="text-primary cursor-pointer hover:underline">
-                Privacy Policy
-              </span>
-            </p>
-          </motion.div>
-        )}
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full border-primary/50 hover:bg-primary/10"
+                  onClick={() => setStep('signup')}
+                >
+                  <User className="w-5 h-5 mr-2" />
+                  Create Account
+                </Button>
+              </div>
 
-        {/* OTP Step */}
-        {authState.step === 'otp' && (
-          <motion.div
-            key="otp"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="w-full max-w-md space-y-8"
-          >
-            <div className="text-center space-y-2">
-              <h1 className="text-3xl font-display font-bold text-gradient-primary">
-                Verify Your Number
-              </h1>
-              <p className="text-muted-foreground">
-                Enter the 6-digit code sent to{' '}
-                <span className="text-foreground font-medium">
-                  {authState.countryCode} {authState.phone}
+              <p className="text-center text-sm text-muted-foreground pt-8">
+                By continuing, you agree to our{' '}
+                <span className="text-primary cursor-pointer hover:underline">
+                  Terms of Service
+                </span>{' '}
+                and{' '}
+                <span className="text-primary cursor-pointer hover:underline">
+                  Privacy Policy
                 </span>
               </p>
-            </div>
+            </motion.div>
+          )}
 
-            <div className="space-y-6">
-              <OtpInput
-                value={otp}
-                onChange={setOtp}
-                onComplete={handleVerifyOtp}
-              />
-
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                onClick={handleVerifyOtp}
-                disabled={isLoading || otp.length !== 6}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    Verify
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </Button>
-
-              <div className="text-center">
-                {countdown > 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Resend code in{' '}
-                    <span className="text-primary font-medium">{countdown}s</span>
-                  </p>
-                ) : (
-                  <button
-                    onClick={handleResendOtp}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Resend verification code
-                  </button>
-                )}
+          {/* Login Step */}
+          {step === 'login' && (
+            <motion.div
+              key="login"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full max-w-md space-y-8"
+            >
+              <div className="text-center space-y-2">
+                <h1 className="text-3xl font-display font-bold text-gradient-primary">
+                  Welcome Back
+                </h1>
+                <p className="text-muted-foreground">
+                  Login to your account
+                </p>
               </div>
-            </div>
-          </motion.div>
-        )}
 
-        {/* Profile Step */}
-        {authState.step === 'profile' && (
-          <motion.div
-            key="profile"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="w-full max-w-md space-y-8"
-          >
-            <div className="text-center space-y-2">
-              <h1 className="text-3xl font-display font-bold text-gradient-primary">
-                Complete Your Profile
-              </h1>
-              <p className="text-muted-foreground">
-                Tell us a bit about yourself
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Avatar Upload */}
-              <div className="flex justify-center">
-                <label className="relative cursor-pointer group">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Email</label>
                   <div className="relative">
-                    <Avatar
-                      src={avatar || undefined}
-                      name={name}
-                      size="xl"
-                      showStatus={false}
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      variant="glow"
+                      className="pl-12"
                     />
-                    <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-xs text-white font-medium">
-                        Change
-                      </span>
-                    </div>
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                    className="hidden"
-                  />
-                </label>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                      variant="glow"
+                      className="pl-12 pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      Login
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </Button>
+
+                <p className="text-center text-sm text-muted-foreground">
+                  Don't have an account?{' '}
+                  <button
+                    onClick={() => setStep('signup')}
+                    className="text-primary hover:underline"
+                  >
+                    Sign up
+                  </button>
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Signup Step */}
+          {step === 'signup' && (
+            <motion.div
+              key="signup"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full max-w-md space-y-8"
+            >
+              <div className="text-center space-y-2">
+                <h1 className="text-3xl font-display font-bold text-gradient-primary">
+                  Create Account
+                </h1>
+                <p className="text-muted-foreground">
+                  Join ZursApp today
+                </p>
               </div>
 
-              {/* Name Input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Your Name
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  variant="glow"
-                  maxLength={50}
-                />
-              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Name</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Enter your name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      variant="glow"
+                      className="pl-12"
+                      maxLength={50}
+                    />
+                  </div>
+                </div>
 
-              {/* Description Input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  About (Optional)
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Write something about yourself..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  variant="glow"
-                  maxLength={150}
-                />
-              </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      variant="glow"
+                      className="pl-12"
+                    />
+                  </div>
+                </div>
 
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                onClick={handleCompleteProfile}
-                disabled={isLoading || !name.trim()}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    Complete Setup
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </Button>
-            </div>
-          </motion.div>
-        )}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Create a password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      variant="glow"
+                      className="pl-12 pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">At least 6 characters</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Confirm Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Confirm your password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSignup()}
+                      variant="glow"
+                      className="pl-12"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleSignup}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      Create Account
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </Button>
+
+                <p className="text-center text-sm text-muted-foreground">
+                  Already have an account?{' '}
+                  <button
+                    onClick={() => setStep('login')}
+                    className="text-primary hover:underline"
+                  >
+                    Login
+                  </button>
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Footer decoration */}
