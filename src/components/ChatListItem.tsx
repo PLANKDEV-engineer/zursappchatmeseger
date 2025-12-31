@@ -2,17 +2,17 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
-import { Chat } from '@/types';
+import type { ChatType } from '@/hooks/useChats';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ChatListItemProps {
-  chat: Chat;
+  chat: ChatType;
   onClick: () => void;
 }
 
 export function ChatListItem({ chat, onClick }: ChatListItemProps) {
-  const lastMessageTime = chat.lastMessage?.timestamp
-    ? formatDistanceToNow(new Date(chat.lastMessage.timestamp), { addSuffix: false })
+  const lastMessageTime = chat.lastMessage?.created_at
+    ? formatDistanceToNow(new Date(chat.lastMessage.created_at), { addSuffix: false })
     : '';
 
   const getStatusIcon = () => {
@@ -38,17 +38,16 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
       className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover transition-all duration-300 group"
     >
       <Avatar
-        src={chat.avatar}
-        name={chat.name}
+        src={chat.avatar_url || undefined}
+        name={chat.name || undefined}
         size="md"
-        isOnline={Math.random() > 0.5} // Simulated online status
         showStatus={chat.type === 'private'}
       />
 
       <div className="flex-1 min-w-0 text-left">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-display font-semibold text-foreground truncate">
-            {chat.name}
+            {chat.name || 'Unknown'}
           </h3>
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             {lastMessageTime}

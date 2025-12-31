@@ -6,84 +6,19 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ChatListItem } from '@/components/ChatListItem';
 import { FloatingMenu } from '@/components/FloatingMenu';
-import { Chat } from '@/types';
+import type { ChatType } from '@/hooks/useChats';
 
 interface ChatDashboardProps {
-  onChatSelect: (chat: Chat) => void;
+  chats: ChatType[];
+  onChatSelect: (chat: ChatType) => void;
   onAddContact: () => void;
   onAddGroup: () => void;
   onAddChannel: () => void;
   onSettings: () => void;
 }
 
-// Demo chats for display
-const demoChats: Chat[] = [
-  {
-    id: '1',
-    type: 'private',
-    participants: ['user1', 'user2'],
-    name: 'John Doe',
-    avatar: undefined,
-    lastMessage: {
-      id: 'm1',
-      chatId: '1',
-      senderId: 'user2',
-      content: 'Hey! How are you doing?',
-      type: 'text',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5),
-      status: 'read',
-    },
-    unreadCount: 0,
-    isPinned: false,
-    isArchived: false,
-    isMuted: false,
-    createdAt: new Date(),
-  },
-  {
-    id: '2',
-    type: 'group',
-    participants: ['user1', 'user2', 'user3'],
-    name: 'Project Team',
-    avatar: undefined,
-    lastMessage: {
-      id: 'm2',
-      chatId: '2',
-      senderId: 'user3',
-      content: 'Meeting at 3 PM today',
-      type: 'text',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      status: 'delivered',
-    },
-    unreadCount: 3,
-    isPinned: true,
-    isArchived: false,
-    isMuted: false,
-    createdAt: new Date(),
-  },
-  {
-    id: '3',
-    type: 'channel',
-    participants: [],
-    name: 'ZursApp Official',
-    avatar: undefined,
-    lastMessage: {
-      id: 'm3',
-      chatId: '3',
-      senderId: 'admin',
-      content: 'Welcome to ZursApp! 🎉',
-      type: 'text',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      status: 'read',
-    },
-    unreadCount: 1,
-    isPinned: false,
-    isArchived: false,
-    isMuted: false,
-    createdAt: new Date(),
-  },
-];
-
 export function ChatDashboard({
+  chats,
   onChatSelect,
   onAddContact,
   onAddGroup,
@@ -92,7 +27,6 @@ export function ChatDashboard({
 }: ChatDashboardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [chats] = useState<Chat[]>(demoChats);
 
   const filteredChats = chats.filter((chat) =>
     chat.name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -118,7 +52,6 @@ export function ChatDashboard({
               placeholder="Search chats..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              variant="glow"
               className="pl-12"
             />
           </div>
@@ -159,7 +92,7 @@ export function ChatDashboard({
               Start a new conversation by adding a contact
             </p>
             <Button
-              variant="primary"
+              variant="default"
               onClick={onAddContact}
             >
               Add Contact

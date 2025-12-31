@@ -16,57 +16,28 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
 import { TypingIndicator } from '@/components/TypingIndicator';
-import { Chat, Message } from '@/types';
+import { useMessages } from '@/hooks/useMessages';
+import type { ChatType } from '@/hooks/useChats';
 
 interface ChatRoomProps {
-  chat: Chat;
+  chat: ChatType;
+  userId: string;
   onBack: () => void;
   onCall: () => void;
   onVideoCall: () => void;
   onInfo: () => void;
 }
 
-// Demo messages
-const demoMessages: Message[] = [
-  {
-    id: '1',
-    chatId: '1',
-    senderId: 'other',
-    content: 'Hey! Welcome to ZursApp 👋',
-    type: 'text',
-    timestamp: new Date(Date.now() - 1000 * 60 * 10),
-    status: 'read',
-  },
-  {
-    id: '2',
-    chatId: '1',
-    senderId: 'me',
-    content: 'Thanks! This looks amazing!',
-    type: 'text',
-    timestamp: new Date(Date.now() - 1000 * 60 * 8),
-    status: 'read',
-  },
-  {
-    id: '3',
-    chatId: '1',
-    senderId: 'other',
-    content: 'Right? The design is so futuristic 🚀',
-    type: 'text',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5),
-    status: 'read',
-  },
-];
-
 export function ChatRoom({
   chat,
+  userId,
   onBack,
   onCall,
   onVideoCall,
   onInfo,
 }: ChatRoomProps) {
-  const [messages, setMessages] = useState<Message[]>(demoMessages);
+  const { messages, loading, sendMessage } = useMessages(chat.id, userId);
   const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [showAttachment, setShowAttachment] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -78,40 +49,14 @@ export function ChatRoom({
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
-
-    const newMessage: Message = {
-      id: crypto.randomUUID(),
-      chatId: chat.id,
-      senderId: 'me',
-      content: inputValue.trim(),
-      type: 'text',
-      timestamp: new Date(),
-      status: 'sent',
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    
+    await sendMessage(inputValue.trim());
     setInputValue('');
-
-    // Simulate reply
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const replyMessage: Message = {
-        id: crypto.randomUUID(),
-        chatId: chat.id,
-        senderId: 'other',
-        content: 'That sounds great! 🎉',
-        type: 'text',
-        timestamp: new Date(),
-        status: 'read',
-      };
-      setMessages((prev) => [...prev, replyMessage]);
-    }, 2000);
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: string) => {
     return new Date(date).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -135,10 +80,9 @@ export function ChatRoom({
 
           <button onClick={onInfo} className="flex items-center gap-3 flex-1">
             <Avatar
-              src={chat.avatar}
-              name={chat.name}
+              src={chat.avatar_url || undefined}
+              name={chat.name || undefined}
               size="sm"
-              isOnline={true}
               showStatus={chat.type === 'private'}
             />
             <div className="text-left">
@@ -165,63 +109,57 @@ export function ChatRoom({
 
       {/* Messages */}
       <main className="flex-1 overflow-y-auto p-4 space-y-4 tech-grid">
-        {messages.map((message, index) => {
-          const isMe = message.senderId === 'me';
-          const showAvatar =
-            index === 0 ||
-            messages[index - 1].senderId !== message.senderId;
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">
+            Mulai percakapan...
+          </div>
+        ) : (
+          messages.map((message, index) => {
+            const isMe = message.sender_id === userId;
+            const showAvatar =
+              index === 0 ||
+              messages[index - 1].sender_id !== message.sender_id;
 
-          return (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
-            >
-              {!isMe && showAvatar && (
-                <Avatar
-                  src={chat.avatar}
-                  name={chat.name}
-                  size="xs"
-                  showStatus={false}
-                />
-              )}
-              {!isMe && !showAvatar && <div className="w-8" />}
-
-              <div
-                className={`max-w-[75%] ${
-                  isMe ? 'message-sent' : 'message-received'
-                } px-4 py-2`}
+            return (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
-                <p className="text-sm">{message.content}</p>
-                <div
-                  className={`flex items-center gap-1 mt-1 ${
-                    isMe ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  <span className="text-[10px] opacity-70">
-                    {formatTime(message.timestamp)}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
+                {!isMe && showAvatar && (
+                  <Avatar
+                    src={message.senderProfile?.avatar_url || undefined}
+                    name={message.senderProfile?.name}
+                    size="xs"
+                    showStatus={false}
+                  />
+                )}
+                {!isMe && !showAvatar && <div className="w-8" />}
 
-        {isTyping && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-2"
-          >
-            <Avatar
-              src={chat.avatar}
-              name={chat.name}
-              size="xs"
-              showStatus={false}
-            />
-            <TypingIndicator />
-          </motion.div>
+                <div
+                  className={`max-w-[75%] ${
+                    isMe ? 'message-sent' : 'message-received'
+                  } px-4 py-2`}
+                >
+                  <p className="text-sm">{message.content}</p>
+                  <div
+                    className={`flex items-center gap-1 mt-1 ${
+                      isMe ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <span className="text-[10px] opacity-70">
+                      {formatTime(message.created_at)}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })
         )}
 
         <div ref={messagesEndRef} />
@@ -286,7 +224,7 @@ export function ChatRoom({
               exit={{ scale: 0 }}
             >
               <Button
-                variant="glow"
+                variant="default"
                 size="icon"
                 onClick={handleSend}
                 className="rounded-full"
