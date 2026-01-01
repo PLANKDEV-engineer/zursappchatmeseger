@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, UserPlus } from 'lucide-react';
+import { X, Search, UserPlus, MessageCircle, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/Avatar';
 import { useContacts } from '@/hooks/useContacts';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface AddContactModalProps {
@@ -15,14 +16,17 @@ interface AddContactModalProps {
 }
 
 export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddContactModalProps) {
-  const { contacts, addContact, searchUsers } = useContacts(userId);
+  const { contacts, addContact, searchUsers, findUserByPublicId } = useContacts(userId);
+  const { profile } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactPhone, setNewContactPhone] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
+  const [newContactPublicId, setNewContactPublicId] = useState('');
+  const [foundUser, setFoundUser] = useState<any>(null);
+  const [isFinding, setIsFinding] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -36,27 +40,57 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
     }
   };
 
-  const handleAddContact = async () => {
-    if (!newContactName.trim()) return;
+  const handleFindByPublicId = async () => {
+    if (!newContactPublicId.trim()) return;
     
-    const { error } = await addContact(newContactName, newContactPhone || undefined);
+    setIsFinding(true);
+    const { data, error } = await findUserByPublicId(newContactPublicId.trim());
+    setIsFinding(false);
+    
+    if (error || !data) {
+      toast({ title: 'Tidak ditemukan', description: 'User ID tidak ditemukan', variant: 'destructive' });
+      setFoundUser(null);
+    } else if (data.user_id === userId) {
+      toast({ title: 'Error', description: 'Tidak bisa menambahkan diri sendiri', variant: 'destructive' });
+      setFoundUser(null);
+    } else {
+      setFoundUser(data);
+    }
+  };
+
+  const handleAddFoundUser = async () => {
+    if (!foundUser) return;
+    
+    const { error } = await addContact(foundUser.name, foundUser.phone, foundUser.public_id);
     if (error) {
-      toast({ title: 'Error', description: 'Gagal menambah kontak', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Berhasil', description: 'Kontak berhasil ditambahkan' });
-      setNewContactName('');
-      setNewContactPhone('');
+      setNewContactPublicId('');
+      setFoundUser(null);
       setShowAddNew(false);
     }
   };
 
-  const handleSelectUser = (user: any) => {
+  const handleSelectUser = async (user: any) => {
+    // First save as contact
+    await addContact(user.name, user.phone, user.public_id);
+    // Then open chat
     onCreateChat(user.user_id);
   };
 
   const handleSelectContact = (contact: any) => {
     if (contact.contact_user_id) {
       onCreateChat(contact.contact_user_id);
+    }
+  };
+
+  const copyMyPublicId = () => {
+    if (profile?.public_id) {
+      navigator.clipboard.writeText(profile.public_id);
+      setCopied(true);
+      toast({ title: 'Tersalin!', description: 'User ID Anda telah disalin' });
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -87,12 +121,27 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                 </Button>
               </div>
 
+              {/* My User ID */}
+              {profile?.public_id && (
+                <div className="mb-4 p-3 rounded-xl bg-primary/10 border border-primary/20">
+                  <p className="text-xs text-muted-foreground mb-1">User ID Anda (bagikan untuk ditambahkan)</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-sm font-mono text-primary truncate">
+                      {profile.public_id}
+                    </code>
+                    <Button variant="ghost" size="icon-sm" onClick={copyMyPublicId}>
+                      {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Search */}
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Cari nama atau nomor..."
+                  placeholder="Cari nama, telepon, atau User ID..."
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   className="pl-12"
@@ -101,7 +150,7 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
             </div>
 
             {/* Content */}
-            <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-4">
+            <div className="overflow-y-auto max-h-[calc(90vh-200px)] p-4">
               {/* Add New Contact Button */}
               <button
                 onClick={() => setShowAddNew(!showAddNew)}
@@ -111,12 +160,12 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                   <UserPlus className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-medium text-foreground">Tambah Kontak Baru</h3>
-                  <p className="text-sm text-muted-foreground">Simpan kontak baru ke daftar</p>
+                  <h3 className="font-medium text-foreground">Tambah dengan User ID</h3>
+                  <p className="text-sm text-muted-foreground">Masukkan User ID untuk menambahkan kontak</p>
                 </div>
               </button>
 
-              {/* Add New Contact Form */}
+              {/* Add by User ID Form */}
               <AnimatePresence>
                 {showAddNew && (
                   <motion.div
@@ -127,18 +176,57 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                   >
                     <div className="space-y-3 p-4 rounded-xl bg-card border border-border">
                       <Input
-                        placeholder="Nama"
-                        value={newContactName}
-                        onChange={e => setNewContactName(e.target.value)}
+                        placeholder="Masukkan User ID"
+                        value={newContactPublicId}
+                        onChange={e => setNewContactPublicId(e.target.value)}
                       />
-                      <Input
-                        placeholder="Nomor Telepon (opsional)"
-                        value={newContactPhone}
-                        onChange={e => setNewContactPhone(e.target.value)}
-                      />
-                      <Button onClick={handleAddContact} className="w-full">
-                        Simpan Kontak
+                      <Button 
+                        onClick={handleFindByPublicId} 
+                        className="w-full"
+                        disabled={isFinding || !newContactPublicId.trim()}
+                      >
+                        {isFinding ? 'Mencari...' : 'Cari User'}
                       </Button>
+
+                      {/* Found User Preview */}
+                      {foundUser && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-3 p-3 rounded-xl bg-primary/10 border border-primary/20"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              src={foundUser.avatar_url}
+                              name={foundUser.name}
+                              size="md"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-foreground">{foundUser.name}</h4>
+                              <p className="text-sm text-muted-foreground truncate">{foundUser.phone || 'No phone'}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <Button 
+                              variant="outline"
+                              onClick={handleAddFoundUser} 
+                              className="flex-1"
+                            >
+                              <UserPlus className="w-4 h-4 mr-2" />
+                              Simpan
+                            </Button>
+                            <Button 
+                              onClick={() => {
+                                handleSelectUser(foundUser);
+                              }} 
+                              className="flex-1"
+                            >
+                              <MessageCircle className="w-4 h-4 mr-2" />
+                              Chat
+                            </Button>
+                          </div>
+                        </motion.div>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -160,18 +248,26 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                           name={user.name}
                           size="md"
                         />
-                        <div className="text-left">
+                        <div className="text-left flex-1 min-w-0">
                           <h4 className="font-medium text-foreground">{user.name}</h4>
-                          <p className="text-sm text-muted-foreground">{user.phone || 'No phone'}</p>
+                          <p className="text-sm text-muted-foreground truncate">{user.phone || 'No phone'}</p>
+                          <p className="text-xs text-primary/70 font-mono truncate">ID: {user.public_id?.slice(0, 8)}...</p>
                         </div>
+                        <MessageCircle className="w-5 h-5 text-primary" />
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
+              {searchQuery && searchResults.length === 0 && !isSearching && (
+                <div className="text-center py-4 text-muted-foreground">
+                  Tidak ada pengguna ditemukan
+                </div>
+              )}
+
               {/* Existing Contacts */}
-              {contacts.length > 0 && (
+              {contacts.length > 0 && !searchQuery && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">Kontak Tersimpan</h3>
                   <div className="space-y-1">
@@ -188,19 +284,26 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                           isOnline={contact.profile?.is_online}
                           showStatus={!!contact.contact_user_id}
                         />
-                        <div className="text-left">
+                        <div className="text-left flex-1 min-w-0">
                           <h4 className="font-medium text-foreground">{contact.name}</h4>
-                          <p className="text-sm text-muted-foreground">{contact.phone || 'No phone'}</p>
+                          <p className="text-sm text-muted-foreground truncate">{contact.phone || 'No phone'}</p>
+                          {contact.profile?.public_id && (
+                            <p className="text-xs text-primary/70 font-mono truncate">
+                              ID: {contact.profile.public_id.slice(0, 8)}...
+                            </p>
+                          )}
                         </div>
+                        <MessageCircle className="w-5 h-5 text-primary" />
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {contacts.length === 0 && !searchQuery && (
+              {contacts.length === 0 && !searchQuery && !showAddNew && (
                 <div className="text-center py-8 text-muted-foreground">
-                  Belum ada kontak tersimpan
+                  <p>Belum ada kontak tersimpan</p>
+                  <p className="text-sm mt-1">Gunakan User ID untuk menambahkan teman</p>
                 </div>
               )}
             </div>

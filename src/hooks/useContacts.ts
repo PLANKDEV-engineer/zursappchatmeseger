@@ -10,6 +10,8 @@ interface ContactWithProfile extends ContactType {
     avatar_url: string | null;
     is_online: boolean;
     last_seen: string | null;
+    public_id: string;
+    phone: string | null;
   };
 }
 
@@ -37,7 +39,7 @@ export function useContacts(userId: string | undefined) {
         if (contact.contact_user_id) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('name, avatar_url, is_online, last_seen')
+            .select('name, avatar_url, is_online, last_seen, public_id, phone')
             .eq('user_id', contact.contact_user_id)
             .single();
           
@@ -62,25 +64,58 @@ export function useContacts(userId: string | undefined) {
     fetchContacts();
   }, [fetchContacts]);
 
-  const addContact = async (name: string, phone?: string) => {
+  const addContact = async (name: string, phone?: string, publicId?: string) => {
     if (!userId) return { error: new Error('Not authenticated') };
     
-    // Try to find user with this phone
+    // Try to find user with this phone or public_id
     let contactUserId: string | undefined;
-    if (phone) {
+    let foundProfile: any = null;
+    
+    if (publicId) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('user_id')
+        .select('user_id, name, avatar_url, phone')
+        .eq('public_id', publicId)
+        .single();
+      
+      if (profile) {
+        contactUserId = profile.user_id;
+        foundProfile = profile;
+      }
+    } else if (phone) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id, name, avatar_url, phone')
         .eq('phone', phone)
         .single();
       
-      contactUserId = profile?.user_id;
+      if (profile) {
+        contactUserId = profile.user_id;
+        foundProfile = profile;
+      }
+    }
+    
+    // Only allow adding if user is registered
+    if (!contactUserId) {
+      return { error: new Error('User not found'), data: null };
+    }
+    
+    // Check if already a contact
+    const { data: existingContact } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('contact_user_id', contactUserId)
+      .single();
+    
+    if (existingContact) {
+      return { error: new Error('Contact already exists'), data: null };
     }
     
     const contact: TablesInsert<'contacts'> = {
       user_id: userId,
-      name,
-      phone,
+      name: foundProfile?.name || name,
+      phone: foundProfile?.phone || phone,
       contact_user_id: contactUserId,
       is_saved: true,
     };
@@ -135,9 +170,19 @@ export function useContacts(userId: string | undefined) {
   const searchUsers = async (query: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('user_id, name, avatar_url, phone')
-      .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
+      .select('user_id, name, avatar_url, phone, public_id')
+      .or(`name.ilike.%${query}%,phone.ilike.%${query}%,public_id::text.ilike.%${query}%`)
       .limit(20);
+    
+    return { data, error };
+  };
+
+  const findUserByPublicId = async (publicId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_id, name, avatar_url, phone, public_id')
+      .eq('public_id', publicId)
+      .single();
     
     return { data, error };
   };
@@ -149,6 +194,7 @@ export function useContacts(userId: string | undefined) {
     updateContact,
     deleteContact,
     searchUsers,
+    findUserByPublicId,
     refreshContacts: fetchContacts,
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ChatProvider } from '@/context/ChatContext';
@@ -14,11 +14,13 @@ import { CreateGroupModal } from '@/components/CreateGroupModal';
 import { CreateStatusModal } from '@/components/CreateStatusModal';
 import { StatusViewer } from '@/components/StatusViewer';
 import { EditProfileModal } from '@/components/EditProfileModal';
+import { CallScreen } from '@/components/CallScreen';
 import { BottomNav } from '@/components/BottomNav';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useChats, type ChatWithDetails } from '@/hooks/useChats';
 import { useStatuses, type StatusType } from '@/hooks/useStatuses';
+import { useCalls } from '@/hooks/useCalls';
 
 type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
 
@@ -38,6 +40,7 @@ function AppContent() {
   const { user, profile, loading, isAdmin } = useAuth();
   const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
+  const { initiateCall, endCall, activeCall } = useCalls(user?.id);
   
   const [currentView, setCurrentView] = useState<View>('chats');
   const [activeNavIndex, setActiveNavIndex] = useState(0);
@@ -47,9 +50,12 @@ function AppContent() {
   // Modal states
   const [showAddContact, setShowAddContact] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateStatus, setShowCreateStatus] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showStatusViewer, setShowStatusViewer] = useState(false);
+  const [showCallScreen, setShowCallScreen] = useState(false);
+  const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
 
   const navItems = [
     { icon: MessageCircle, label: 'Chats', path: 'chats' },
@@ -96,19 +102,20 @@ function AppContent() {
   const handleCreateChat = async (otherUserId: string) => {
     const { data } = await createPrivateChat(otherUserId);
     if (data) {
-      setSelectedChat(data as ChatWithDetails);
+      setSelectedChat(data);
       setCurrentView('chatroom');
     }
     setShowAddContact(false);
   };
 
-  const handleCreateGroup = async (name: string, participantIds: string[]) => {
-    const { data } = await createGroupChat(name, participantIds);
+  const handleCreateGroup = async (name: string, participantIds: string[], isChannel?: boolean) => {
+    const { data } = await createGroupChat(name, participantIds, isChannel);
     if (data) {
-      setSelectedChat(data as ChatWithDetails);
+      setSelectedChat(data);
       setCurrentView('chatroom');
     }
     setShowCreateGroup(false);
+    setShowCreateChannel(false);
   };
 
   const handleCreateStatus = async (
@@ -120,6 +127,26 @@ function AppContent() {
     setShowCreateStatus(false);
   };
 
+  const handleCall = async (receiverId: string, type: 'voice' | 'video') => {
+    const { data } = await initiateCall(receiverId, type);
+    if (data) {
+      setCallInfo({
+        type,
+        name: data.receiverProfile?.name || 'Unknown',
+        avatar: data.receiverProfile?.avatar_url || undefined,
+      });
+      setShowCallScreen(true);
+    }
+  };
+
+  const handleEndCall = async () => {
+    if (activeCall) {
+      await endCall(activeCall.id);
+    }
+    setShowCallScreen(false);
+    setCallInfo(null);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {currentView === 'chats' && (
@@ -128,7 +155,7 @@ function AppContent() {
           onChatSelect={handleChatSelect}
           onAddContact={() => setShowAddContact(true)}
           onAddGroup={() => setShowCreateGroup(true)}
-          onAddChannel={() => setShowCreateGroup(true)}
+          onAddChannel={() => setShowCreateChannel(true)}
           onSettings={() => handleNavigate(3)}
         />
       )}
@@ -138,8 +165,8 @@ function AppContent() {
           chat={selectedChat}
           userId={user.id}
           onBack={handleBackFromChat}
-          onCall={() => {}}
-          onVideoCall={() => {}}
+          onCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'voice')}
+          onVideoCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'video')}
           onInfo={() => {}}
         />
       )}
@@ -154,7 +181,7 @@ function AppContent() {
         />
       )}
 
-      {currentView === 'calls' && <CallsPage onCall={() => {}} />}
+      {currentView === 'calls' && <CallsPage onCall={handleCall} />}
 
       {currentView === 'settings' && (
         <SettingsPage onEditProfile={() => setShowEditProfile(true)} />
@@ -185,6 +212,15 @@ function AppContent() {
         onClose={() => setShowCreateGroup(false)}
         userId={user.id}
         onCreateGroup={handleCreateGroup}
+        mode="group"
+      />
+
+      <CreateGroupModal
+        isOpen={showCreateChannel}
+        onClose={() => setShowCreateChannel(false)}
+        userId={user.id}
+        onCreateGroup={handleCreateGroup}
+        mode="channel"
       />
 
       <CreateStatusModal
@@ -204,6 +240,18 @@ function AppContent() {
         statuses={selectedUserStatuses}
         onView={viewStatus}
       />
+
+      {/* Call Screen */}
+      {callInfo && (
+        <CallScreen
+          isOpen={showCallScreen}
+          onClose={() => setShowCallScreen(false)}
+          callType={callInfo.type}
+          callerName={callInfo.name}
+          callerAvatar={callInfo.avatar}
+          onEndCall={handleEndCall}
+        />
+      )}
     </div>
   );
 }

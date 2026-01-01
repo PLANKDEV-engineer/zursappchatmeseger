@@ -338,6 +338,7 @@ export type Database = {
           last_seen: string | null
           name: string
           phone: string | null
+          public_id: string
           updated_at: string | null
           user_id: string
         }
@@ -351,6 +352,7 @@ export type Database = {
           last_seen?: string | null
           name: string
           phone?: string | null
+          public_id?: string
           updated_at?: string | null
           user_id: string
         }
@@ -364,6 +366,7 @@ export type Database = {
           last_seen?: string | null
           name?: string
           phone?: string | null
+          public_id?: string
           updated_at?: string | null
           user_id?: string
         }
