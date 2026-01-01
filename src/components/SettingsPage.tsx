@@ -15,51 +15,88 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { NotificationsPage } from '@/components/settings/NotificationsPage';
+import { PrivacyPage } from '@/components/settings/PrivacyPage';
+import { SecurityPage } from '@/components/settings/SecurityPage';
+import { AppearancePage } from '@/components/settings/AppearancePage';
+import { HelpPage } from '@/components/settings/HelpPage';
+import { AboutPage } from '@/components/settings/AboutPage';
 
 interface SettingsPageProps {
   onEditProfile: () => void;
 }
+
+type SettingsView = 'main' | 'notifications' | 'privacy' | 'security' | 'appearance' | 'help' | 'about';
 
 const settingsItems = [
   {
     icon: Bell,
     label: 'Notifications',
     description: 'Message, group & call tones',
+    view: 'notifications' as SettingsView,
   },
   {
     icon: Lock,
     label: 'Privacy',
     description: 'Block contacts, disappearing messages',
+    view: 'privacy' as SettingsView,
   },
   {
     icon: Shield,
     label: 'Security',
     description: 'End-to-end encryption, app lock',
+    view: 'security' as SettingsView,
   },
   {
     icon: Palette,
     label: 'Appearance',
     description: 'Theme, wallpaper, chat display',
+    view: 'appearance' as SettingsView,
   },
   {
     icon: HelpCircle,
     label: 'Help',
     description: 'Help center, contact us, privacy policy',
+    view: 'help' as SettingsView,
   },
   {
     icon: Info,
     label: 'About',
     description: 'App version, licenses',
+    view: 'about' as SettingsView,
   },
 ];
 
 export function SettingsPage({ onEditProfile }: SettingsPageProps) {
   const { profile, signOut } = useAuth();
+  const [currentView, setCurrentView] = useState<SettingsView>('main');
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   const handleLogout = async () => {
     await signOut();
   };
+
+  const handleBack = () => setCurrentView('main');
+
+  // Render sub-pages
+  if (currentView === 'notifications') {
+    return <NotificationsPage onBack={handleBack} />;
+  }
+  if (currentView === 'privacy') {
+    return <PrivacyPage onBack={handleBack} />;
+  }
+  if (currentView === 'security') {
+    return <SecurityPage onBack={handleBack} />;
+  }
+  if (currentView === 'appearance') {
+    return <AppearancePage onBack={handleBack} />;
+  }
+  if (currentView === 'help') {
+    return <HelpPage onBack={handleBack} />;
+  }
+  if (currentView === 'about') {
+    return <AboutPage onBack={handleBack} />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
@@ -107,6 +144,7 @@ export function SettingsPage({ onEditProfile }: SettingsPageProps) {
               transition={{ delay: index * 0.05 }}
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
+              onClick={() => setCurrentView(item.view)}
               className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-card transition-all"
             >
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">

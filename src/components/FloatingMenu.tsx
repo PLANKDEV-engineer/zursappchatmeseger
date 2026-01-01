@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Users, Radio, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface FloatingMenuProps {
   isOpen: boolean;
@@ -52,8 +51,8 @@ export function FloatingMenu({
             className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
           />
 
-          {/* Menu Items */}
-          <div className="fixed bottom-24 right-6 z-50 flex flex-col-reverse items-end gap-3">
+          {/* Menu Items - positioned higher to avoid collision */}
+          <div className="fixed bottom-40 right-6 z-50 flex flex-col-reverse items-end gap-4">
             {menuItems.map((item, index) => (
               <motion.div
                 key={item.label}
@@ -67,7 +66,7 @@ export function FloatingMenu({
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 + 0.1 }}
-                  className="px-3 py-1.5 rounded-lg bg-card text-sm font-medium text-foreground shadow-lg"
+                  className="px-3 py-1.5 rounded-lg bg-card text-sm font-medium text-foreground shadow-lg border border-border"
                 >
                   {item.label}
                 </motion.span>
@@ -84,7 +83,7 @@ export function FloatingMenu({
             ))}
           </div>
 
-          {/* Close Button */}
+          {/* Close Button - stays in FAB position */}
           <motion.button
             initial={{ rotate: 0 }}
             animate={{ rotate: 45 }}

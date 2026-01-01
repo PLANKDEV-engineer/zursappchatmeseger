@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ChatListItem } from '@/components/ChatListItem';
 import { FloatingMenu } from '@/components/FloatingMenu';
-import type { ChatType } from '@/hooks/useChats';
+import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface ChatDashboardProps {
-  chats: ChatType[];
-  onChatSelect: (chat: ChatType) => void;
+  chats: ChatWithDetails[];
+  onChatSelect: (chat: ChatWithDetails) => void;
   onAddContact: () => void;
   onAddGroup: () => void;
   onAddChannel: () => void;
