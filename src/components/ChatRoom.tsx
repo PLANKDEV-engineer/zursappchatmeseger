@@ -9,14 +9,17 @@ import {
   Smile,
   Mic,
   Send,
-  Image,
-  FileText,
-  Camera,
+  BarChart3,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { useMessages } from '@/hooks/useMessages';
+import { useTyping } from '@/hooks/useTyping';
+import { MediaUpload } from '@/components/MediaUpload';
+import { PollCreator } from '@/components/PollCreator';
+import { MessageMenu, ReactionPicker } from '@/components/ChatOptionsMenu';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface ChatRoomProps {
@@ -36,9 +39,14 @@ export function ChatRoom({
   onVideoCall,
   onInfo,
 }: ChatRoomProps) {
-  const { messages, loading, sendMessage } = useMessages(chat.id, userId);
+  const { messages, loading, sendMessage, deleteMessage, addReaction } = useMessages(chat.id, userId);
+  const { typingUsers, setTyping } = useTyping(chat.id, userId);
   const [inputValue, setInputValue] = useState('');
-  const [showAttachment, setShowAttachment] = useState(false);
+  const [showMediaUpload, setShowMediaUpload] = useState(false);
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+  const [showReactions, setShowReactions] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -49,11 +57,27 @@ export function ChatRoom({
     scrollToBottom();
   }, [messages]);
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    setTyping(true);
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
     
-    await sendMessage(inputValue.trim());
+    await sendMessage(inputValue.trim(), 'text', undefined, replyTo?.id);
     setInputValue('');
+    setReplyTo(null);
+    setTyping(false);
+  };
+
+  const handleMediaSend = async (type: string, content: string, mediaUrl?: string) => {
+    await sendMessage(content, type as any, mediaUrl);
+  };
+
+  const handlePollCreate = async (question: string, options: string[]) => {
+    const pollData = JSON.stringify({ question, options, votes: options.map(() => 0) });
+    await sendMessage(pollData, 'poll');
   };
 
   const formatTime = (date: string) => {
@@ -63,11 +87,19 @@ export function ChatRoom({
     });
   };
 
-  const attachmentOptions = [
-    { icon: Image, label: 'Photo', color: 'text-green-400' },
-    { icon: Camera, label: 'Camera', color: 'text-blue-400' },
-    { icon: FileText, label: 'Document', color: 'text-purple-400' },
-  ];
+  const formatLastSeen = (date: string | null | undefined) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const minutes = Math.floor(diff / (1000 * 60));
+    if (minutes < 1) return 'baru saja';
+    if (minutes < 60) return `${minutes}m lalu`;
+    return `${Math.floor(minutes / 60)}j lalu`;
+  };
+
+  const isOfficial = chat.is_official;
+  const canSendMessage = !chat.only_admins_can_send || chat.participantProfile?.is_admin;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -86,10 +118,22 @@ export function ChatRoom({
               showStatus={chat.type === 'private'}
             />
             <div className="text-left">
-              <h2 className="font-display font-semibold text-foreground">
-                {chat.name}
-              </h2>
-              <p className="text-xs text-primary">Online</p>
+              <div className="flex items-center gap-1">
+                <h2 className="font-display font-semibold text-foreground">
+                  {chat.name}
+                </h2>
+                {isOfficial && (
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                )}
+              </div>
+              <p className="text-xs text-primary">
+                {typingUsers.length > 0 
+                  ? `${typingUsers[0]?.name || 'Seseorang'} sedang mengetik...`
+                  : chat.type === 'private' 
+                    ? 'Online' 
+                    : `${chat.type === 'channel' ? 'Saluran' : 'Grup'}`
+                }
+              </p>
             </div>
           </button>
 
@@ -118,11 +162,8 @@ export function ChatRoom({
             Mulai percakapan...
           </div>
         ) : (
-          messages.map((message, index) => {
+          messages.map((message) => {
             const isMe = message.sender_id === userId;
-            const showAvatar =
-              index === 0 ||
-              messages[index - 1].sender_id !== message.sender_id;
 
             return (
               <motion.div
@@ -131,7 +172,7 @@ export function ChatRoom({
                 animate={{ opacity: 1, y: 0 }}
                 className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
-                {!isMe && showAvatar && (
+                {!isMe && (
                   <Avatar
                     src={message.senderProfile?.avatar_url || undefined}
                     name={message.senderProfile?.name}
@@ -139,106 +180,136 @@ export function ChatRoom({
                     showStatus={false}
                   />
                 )}
-                {!isMe && !showAvatar && <div className="w-8" />}
 
                 <div
-                  className={`max-w-[75%] ${
-                    isMe ? 'message-sent' : 'message-received'
-                  } px-4 py-2`}
+                  className={`max-w-[75%] ${isMe ? 'message-sent' : 'message-received'} px-4 py-2 relative`}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setSelectedMessage(message.id);
+                  }}
+                  onClick={() => setSelectedMessage(message.id)}
                 >
+                  {!isMe && chat.type !== 'private' && (
+                    <p className="text-xs font-medium text-primary mb-1">
+                      {message.senderProfile?.name}
+                    </p>
+                  )}
                   <p className="text-sm">{message.content}</p>
-                  <div
-                    className={`flex items-center gap-1 mt-1 ${
-                      isMe ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
+                  <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                     <span className="text-[10px] opacity-70">
                       {formatTime(message.created_at)}
                     </span>
                   </div>
+
+                  {/* Reactions */}
+                  {message.reactions && message.reactions.length > 0 && (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => (
+                        <span key={emoji} className="text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                          {emoji} {message.reactions?.filter(r => r.emoji === emoji).length}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             );
           })
         )}
 
+        {typingUsers.length > 0 && <TypingIndicator />}
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Attachment Menu */}
-      <AnimatePresence>
-        {showAttachment && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-20 left-4 right-4 p-4 rounded-xl bg-card border border-border shadow-xl"
-          >
-            <div className="flex justify-around">
-              {attachmentOptions.map((option) => (
-                <button
-                  key={option.label}
-                  onClick={() => setShowAttachment(false)}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-card-hover transition-colors"
-                >
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                    <option.icon className={`w-6 h-6 ${option.color}`} />
-                  </div>
-                  <span className="text-xs text-foreground">{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Reply Preview */}
+      {replyTo && (
+        <div className="px-4 py-2 bg-card border-t border-border flex items-center gap-2">
+          <div className="flex-1 p-2 bg-muted rounded-lg">
+            <p className="text-xs text-primary">Membalas</p>
+            <p className="text-sm text-muted-foreground line-clamp-1">{replyTo.content}</p>
+          </div>
+          <button onClick={() => setReplyTo(null)} className="p-2">×</button>
+        </div>
+      )}
 
       {/* Input Bar */}
-      <footer className="sticky bottom-0 bg-background-secondary/95 backdrop-blur-xl border-t border-border/50 p-3">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowAttachment(!showAttachment)}
-          >
-            <Paperclip className="w-5 h-5" />
-          </Button>
+      {canSendMessage ? (
+        <footer className="sticky bottom-0 bg-background-secondary/95 backdrop-blur-xl border-t border-border/50 p-3">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setShowMediaUpload(true)}>
+              <Paperclip className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setShowPollCreator(true)}>
+              <BarChart3 className="w-5 h-5" />
+            </Button>
 
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Type a message..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              className="w-full h-11 px-4 pr-12 rounded-full bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-            />
-            <button className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Smile className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
-            </button>
-          </div>
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Ketik pesan..."
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                className="w-full h-11 px-4 pr-12 rounded-full bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              />
+              <button className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Smile className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+              </button>
+            </div>
 
-          {inputValue.trim() ? (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-            >
-              <Button
-                variant="default"
-                size="icon"
-                onClick={handleSend}
-                className="rounded-full"
-              >
+            {inputValue.trim() ? (
+              <Button variant="default" size="icon" onClick={handleSend} className="rounded-full">
                 <Send className="w-5 h-5" />
               </Button>
-            </motion.div>
-          ) : (
-            <Button variant="ghost" size="icon">
-              <Mic className="w-5 h-5" />
-            </Button>
-          )}
-        </div>
-      </footer>
+            ) : (
+              <Button variant="ghost" size="icon">
+                <Mic className="w-5 h-5" />
+              </Button>
+            )}
+          </div>
+        </footer>
+      ) : (
+        <footer className="p-4 bg-muted text-center">
+          <p className="text-muted-foreground text-sm">Hanya admin yang dapat mengirim pesan</p>
+        </footer>
+      )}
+
+      {/* Media Upload Modal */}
+      <MediaUpload
+        isOpen={showMediaUpload}
+        onClose={() => setShowMediaUpload(false)}
+        onSend={handleMediaSend}
+        chatId={chat.id}
+        userId={userId}
+      />
+
+      {/* Poll Creator Modal */}
+      <PollCreator
+        isOpen={showPollCreator}
+        onClose={() => setShowPollCreator(false)}
+        onCreatePoll={handlePollCreate}
+      />
+
+      {/* Message Menu */}
+      <MessageMenu
+        isOpen={!!selectedMessage}
+        onClose={() => setSelectedMessage(null)}
+        onReply={() => {
+          const msg = messages.find(m => m.id === selectedMessage);
+          if (msg) setReplyTo({ id: msg.id, content: msg.content || '' });
+        }}
+        onReact={() => setShowReactions(selectedMessage)}
+        onCopy={() => {
+          const msg = messages.find(m => m.id === selectedMessage);
+          if (msg?.content) navigator.clipboard.writeText(msg.content);
+        }}
+        onForward={() => {}}
+        onDelete={(forEveryone) => {
+          if (selectedMessage) deleteMessage(selectedMessage, forEveryone);
+        }}
+        isOwnMessage={messages.find(m => m.id === selectedMessage)?.sender_id === userId}
+        messageContent={messages.find(m => m.id === selectedMessage)?.content || ''}
+      />
     </div>
   );
 }
