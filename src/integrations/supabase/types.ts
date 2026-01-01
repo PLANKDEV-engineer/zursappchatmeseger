@@ -488,6 +488,38 @@ export type Database = {
         }
         Relationships: []
       }
+      typing_status: {
+        Row: {
+          chat_id: string
+          id: string
+          is_typing: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "typing_status_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
