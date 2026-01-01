@@ -1,58 +1,46 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Video, PhoneIncoming, PhoneMissed, PhoneOutgoing } from 'lucide-react';
+import { Phone, Video, PhoneIncoming, PhoneMissed, PhoneOutgoing, Clock } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
+import { useCalls } from '@/hooks/useCalls';
+import { useAuth } from '@/context/AuthContext';
+import { formatDistanceToNow } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 interface CallsPageProps {
   onCall: (userId: string, type: 'voice' | 'video') => void;
 }
 
-// Demo call history
-const demoCalls = [
-  {
-    id: '1',
-    userId: 'user1',
-    name: 'John Doe',
-    avatar: undefined,
-    type: 'incoming' as const,
-    callType: 'voice' as const,
-    time: '10:30 AM',
-    date: 'Today',
-    missed: false,
-  },
-  {
-    id: '2',
-    userId: 'user2',
-    name: 'Jane Smith',
-    avatar: undefined,
-    type: 'outgoing' as const,
-    callType: 'video' as const,
-    time: '9:15 AM',
-    date: 'Today',
-    missed: false,
-  },
-  {
-    id: '3',
-    userId: 'user3',
-    name: 'Alex Johnson',
-    avatar: undefined,
-    type: 'incoming' as const,
-    callType: 'voice' as const,
-    time: '8:00 PM',
-    date: 'Yesterday',
-    missed: true,
-  },
-];
-
 export function CallsPage({ onCall }: CallsPageProps) {
-  const getCallIcon = (call: (typeof demoCalls)[0]) => {
-    if (call.missed) {
+  const { user } = useAuth();
+  const { calls, loading } = useCalls(user?.id);
+
+  const getCallIcon = (call: (typeof calls)[0]) => {
+    const isCaller = call.caller_id === user?.id;
+    
+    if (call.status === 'missed') {
       return <PhoneMissed className="w-4 h-4 text-destructive" />;
     }
-    if (call.type === 'incoming') {
-      return <PhoneIncoming className="w-4 h-4 text-success" />;
+    if (isCaller) {
+      return <PhoneOutgoing className="w-4 h-4 text-primary" />;
     }
-    return <PhoneOutgoing className="w-4 h-4 text-primary" />;
+    return <PhoneIncoming className="w-4 h-4 text-green-500" />;
+  };
+
+  const getOtherPerson = (call: (typeof calls)[0]) => {
+    const isCaller = call.caller_id === user?.id;
+    return isCaller ? call.receiverProfile : call.callerProfile;
+  };
+
+  const getOtherUserId = (call: (typeof calls)[0]) => {
+    return call.caller_id === user?.id ? call.receiver_id : call.caller_id;
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -60,60 +48,84 @@ export function CallsPage({ onCall }: CallsPageProps) {
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background-secondary/95 backdrop-blur-xl border-b border-border/50 p-4">
         <h1 className="text-2xl font-display font-bold text-gradient-primary">
-          Calls
+          Panggilan
         </h1>
       </header>
 
       <main className="flex-1 p-4">
-        {demoCalls.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          </div>
+        ) : calls.length > 0 ? (
           <div className="space-y-2">
-            {demoCalls.map((call, index) => (
-              <motion.div
-                key={call.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="flex items-center gap-4 p-4 rounded-xl hover:bg-card transition-all"
-              >
-                <Avatar
-                  src={call.avatar}
-                  name={call.name}
-                  size="md"
-                  showStatus={false}
-                />
+            {calls.map((call, index) => {
+              const otherPerson = getOtherPerson(call);
+              const otherUserId = getOtherUserId(call);
+              
+              return (
+                <motion.div
+                  key={call.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="flex items-center gap-4 p-4 rounded-xl hover:bg-card transition-all"
+                >
+                  <Avatar
+                    src={otherPerson?.avatar_url || undefined}
+                    name={otherPerson?.name || 'Unknown'}
+                    size="md"
+                    showStatus={false}
+                  />
 
-                <div className="flex-1">
-                  <h3
-                    className={`font-display font-semibold ${
-                      call.missed ? 'text-destructive' : 'text-foreground'
-                    }`}
-                  >
-                    {call.name}
-                  </h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    {getCallIcon(call)}
-                    <span>{call.date}</span>
-                    <span>•</span>
-                    <span>{call.time}</span>
+                  <div className="flex-1">
+                    <h3
+                      className={`font-display font-semibold ${
+                        call.status === 'missed' ? 'text-destructive' : 'text-foreground'
+                      }`}
+                    >
+                      {otherPerson?.name || 'Unknown'}
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      {getCallIcon(call)}
+                      <span className="capitalize">{call.type}</span>
+                      {call.duration_seconds && call.duration_seconds > 0 && (
+                        <>
+                          <span>•</span>
+                          <span>{formatDuration(call.duration_seconds)}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                      <Clock className="w-3 h-3" />
+                      <span>
+                        {call.started_at
+                          ? formatDistanceToNow(new Date(call.started_at), {
+                              addSuffix: true,
+                              locale: id,
+                            })
+                          : '-'}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onCall(call.userId, 'voice')}
-                    className="w-10 h-10 rounded-full bg-card hover:bg-primary/20 flex items-center justify-center transition-colors"
-                  >
-                    <Phone className="w-5 h-5 text-primary" />
-                  </button>
-                  <button
-                    onClick={() => onCall(call.userId, 'video')}
-                    className="w-10 h-10 rounded-full bg-card hover:bg-primary/20 flex items-center justify-center transition-colors"
-                  >
-                    <Video className="w-5 h-5 text-primary" />
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onCall(otherUserId, 'voice')}
+                      className="w-10 h-10 rounded-full bg-card hover:bg-primary/20 flex items-center justify-center transition-colors"
+                    >
+                      <Phone className="w-5 h-5 text-primary" />
+                    </button>
+                    <button
+                      onClick={() => onCall(otherUserId, 'video')}
+                      className="w-10 h-10 rounded-full bg-card hover:bg-primary/20 flex items-center justify-center transition-colors"
+                    >
+                      <Video className="w-5 h-5 text-primary" />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -121,10 +133,10 @@ export function CallsPage({ onCall }: CallsPageProps) {
               <Phone className="w-12 h-12 text-primary" />
             </div>
             <h2 className="text-xl font-display font-semibold text-foreground mb-2">
-              No Call History
+              Belum Ada Riwayat
             </h2>
             <p className="text-muted-foreground">
-              Your recent calls will appear here
+              Panggilan terbaru Anda akan muncul di sini
             </p>
           </div>
         )}

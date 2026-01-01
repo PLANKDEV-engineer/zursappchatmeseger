@@ -148,7 +148,22 @@ export function useChats(userId: string | undefined) {
           .single();
         
         if (existingChat) {
-          return { data: existingChat, error: null };
+          // Return as ChatWithDetails
+          const { data: otherProfile } = await supabase
+            .from('profiles')
+            .select('name, avatar_url')
+            .eq('user_id', otherUserId)
+            .single();
+          
+          const chatWithDetails: ChatWithDetails = {
+            ...existingChat,
+            name: otherProfile?.name || existingChat.name,
+            avatar_url: otherProfile?.avatar_url || existingChat.avatar_url,
+            lastMessage: null,
+            unreadCount: 0,
+          };
+          
+          return { data: chatWithDetails, error: null };
         }
       }
     }
@@ -174,19 +189,35 @@ export function useChats(userId: string | undefined) {
     
     if (partError) return { data: null, error: partError };
     
+    // Get other user profile for name/avatar
+    const { data: otherProfile } = await supabase
+      .from('profiles')
+      .select('name, avatar_url')
+      .eq('user_id', otherUserId)
+      .single();
+    
+    const chatWithDetails: ChatWithDetails = {
+      ...chat,
+      name: otherProfile?.name || chat.name,
+      avatar_url: otherProfile?.avatar_url || chat.avatar_url,
+      lastMessage: null,
+      unreadCount: 0,
+    };
+    
     fetchChats();
-    return { data: chat, error: null };
+    return { data: chatWithDetails, error: null };
   };
 
-  const createGroupChat = async (name: string, participantIds: string[]) => {
+  const createGroupChat = async (name: string, participantIds: string[], isChannel = false) => {
     if (!userId) return { error: new Error('Not authenticated') };
     
     const { data: chat, error: chatError } = await supabase
       .from('chats')
       .insert({ 
-        type: 'group', 
+        type: isChannel ? 'channel' : 'group', 
         name, 
-        created_by: userId 
+        created_by: userId,
+        only_admins_can_send: isChannel,
       })
       .select()
       .single();
@@ -205,8 +236,14 @@ export function useChats(userId: string | undefined) {
     
     if (partError) return { data: null, error: partError };
     
+    const chatWithDetails: ChatWithDetails = {
+      ...chat,
+      lastMessage: null,
+      unreadCount: 0,
+    };
+    
     fetchChats();
-    return { data: chat, error: null };
+    return { data: chatWithDetails, error: null };
   };
 
   return {

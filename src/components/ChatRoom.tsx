@@ -17,10 +17,10 @@ import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { useMessages } from '@/hooks/useMessages';
-import type { ChatType } from '@/hooks/useChats';
+import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface ChatRoomProps {
-  chat: ChatType;
+  chat: ChatWithDetails;
   userId: string;
   onBack: () => void;
   onCall: () => void;
