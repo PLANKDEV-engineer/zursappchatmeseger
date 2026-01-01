@@ -2,11 +2,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
-import type { ChatType } from '@/hooks/useChats';
+import type { ChatWithDetails } from '@/hooks/useChats';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ChatListItemProps {
-  chat: ChatType;
+  chat: ChatWithDetails;
   onClick: () => void;
 }
 

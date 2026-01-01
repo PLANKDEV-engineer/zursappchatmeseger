@@ -17,7 +17,7 @@ import { EditProfileModal } from '@/components/EditProfileModal';
 import { BottomNav } from '@/components/BottomNav';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useChats, type ChatType } from '@/hooks/useChats';
+import { useChats, type ChatWithDetails } from '@/hooks/useChats';
 import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 
 type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
@@ -41,7 +41,7 @@ function AppContent() {
   
   const [currentView, setCurrentView] = useState<View>('chats');
   const [activeNavIndex, setActiveNavIndex] = useState(0);
-  const [selectedChat, setSelectedChat] = useState<ChatType | null>(null);
+  const [selectedChat, setSelectedChat] = useState<ChatWithDetails | null>(null);
   const [selectedUserStatuses, setSelectedUserStatuses] = useState<StatusType[]>([]);
 
   // Modal states
@@ -74,7 +74,7 @@ function AppContent() {
     setSelectedChat(null);
   };
 
-  const handleChatSelect = (chat: ChatType) => {
+  const handleChatSelect = (chat: ChatWithDetails) => {
     setSelectedChat(chat);
     setCurrentView('chatroom');
   };
@@ -96,7 +96,7 @@ function AppContent() {
   const handleCreateChat = async (otherUserId: string) => {
     const { data } = await createPrivateChat(otherUserId);
     if (data) {
-      setSelectedChat(data as ChatType);
+      setSelectedChat(data as ChatWithDetails);
       setCurrentView('chatroom');
     }
     setShowAddContact(false);
@@ -105,7 +105,7 @@ function AppContent() {
   const handleCreateGroup = async (name: string, participantIds: string[]) => {
     const { data } = await createGroupChat(name, participantIds);
     if (data) {
-      setSelectedChat(data as ChatType);
+      setSelectedChat(data as ChatWithDetails);
       setCurrentView('chatroom');
     }
     setShowCreateGroup(false);

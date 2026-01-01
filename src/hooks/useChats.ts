@@ -6,7 +6,7 @@ export type ChatType = Tables<'chats'>;
 export type ChatParticipant = Tables<'chat_participants'>;
 export type MessageType = Tables<'messages'>;
 
-interface ChatWithDetails extends ChatType {
+export interface ChatWithDetails extends ChatType {
   lastMessage?: MessageType | null;
   unreadCount: number;
   participants?: { user_id: string; name: string; avatar_url: string | null }[];
