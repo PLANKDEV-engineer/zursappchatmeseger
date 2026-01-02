@@ -151,22 +151,25 @@ export function ProfileView({
             {/* Info Section */}
             <div className="px-4 space-y-4">
               <div className="bg-card rounded-xl border border-border/50 p-4 space-y-4">
+                {/* User ID - menggunakan nomor telepon */}
+                {profile.phone && (
+                  <div className="flex items-center gap-3">
+                    <AtSign className="w-5 h-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">User ID</p>
+                      <p className="text-foreground font-mono">
+                        {profile.phone.replace(/\D/g, '').slice(-11)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
                 {profile.phone && (
                   <div className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Telepon</p>
                       <p className="text-foreground">{profile.phone}</p>
-                    </div>
-                  </div>
-                )}
-                
-                {profile.public_id && (
-                  <div className="flex items-center gap-3">
-                    <AtSign className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Public ID</p>
-                      <p className="text-foreground font-mono text-sm">{profile.public_id.slice(0, 8)}...</p>
                     </div>
                   </div>
                 )}
