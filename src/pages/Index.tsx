@@ -40,6 +40,11 @@ function LoadingScreen() {
 function AppContent() {
   const { user, profile, loading, isAdmin } = useAuth();
   const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
+  
+  // Filter channels from chat list - channels only appear in Status page
+  const privateAndGroupChats = chats.filter(c => c.type !== 'channel');
+  const channels = chats.filter(c => c.type === 'channel');
+  
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
   
@@ -155,7 +160,7 @@ function AppContent() {
     <div className="min-h-screen bg-background">
       {currentView === 'chats' && (
         <ChatDashboard
-          chats={chats}
+          chats={privateAndGroupChats}
           onChatSelect={handleChatSelect}
           onAddContact={() => setShowAddContact(true)}
           onAddGroup={() => setShowCreateGroup(true)}
@@ -179,9 +184,11 @@ function AppContent() {
         <StatusPage
           myStatuses={myStatuses}
           contactStatuses={contactStatuses}
+          channels={channels}
           profile={profile}
           onViewStatus={handleViewStatus}
           onCreateStatus={() => setShowCreateStatus(true)}
+          onChannelSelect={handleChatSelect}
         />
       )}
 

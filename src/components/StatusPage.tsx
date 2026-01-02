@@ -1,9 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Radio, Users, CheckCircle2 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import type { StatusType } from '@/hooks/useStatuses';
 import type { Profile } from '@/context/AuthContext';
+import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface UserStatuses {
   userId: string;
@@ -16,17 +17,29 @@ interface UserStatuses {
 interface StatusPageProps {
   myStatuses: StatusType[];
   contactStatuses: UserStatuses[];
+  channels: ChatWithDetails[];
   profile: Profile | null;
   onViewStatus: (statuses: StatusType[]) => void;
   onCreateStatus: () => void;
+  onChannelSelect: (channel: ChatWithDetails) => void;
 }
+
+const formatFollowers = (count: number): string => {
+  if (count >= 1e12) return `${(count / 1e12).toFixed(1)}T`;
+  if (count >= 1e9) return `${(count / 1e9).toFixed(1)}M`;
+  if (count >= 1e6) return `${(count / 1e6).toFixed(1)}jt`;
+  if (count >= 1e3) return `${(count / 1e3).toFixed(1)}rb`;
+  return count.toString();
+};
 
 export function StatusPage({ 
   myStatuses, 
   contactStatuses, 
+  channels,
   profile,
   onViewStatus, 
-  onCreateStatus 
+  onCreateStatus,
+  onChannelSelect
 }: StatusPageProps) {
   const formatTime = (date: string) => {
     const now = new Date();
@@ -143,7 +156,67 @@ export function StatusPage({
           </section>
         )}
 
-        {contactStatuses.length === 0 && myStatuses.length === 0 && (
+        {/* Channels Section - Rekomendasi */}
+        {channels.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Radio className="w-4 h-4 text-primary" />
+              <h2 className="text-sm font-medium text-muted-foreground">
+                Rekomendasi
+              </h2>
+            </div>
+            <div className="space-y-2">
+              {channels.map((channel, index) => (
+                <motion.button
+                  key={channel.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => onChannelSelect(channel)}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-card border border-border/50 hover:bg-card-hover transition-all"
+                >
+                  <div className="relative">
+                    <div className="p-0.5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500">
+                      <div className="bg-background rounded-full p-0.5">
+                        <Avatar
+                          src={channel.avatar_url || undefined}
+                          name={channel.name || 'Channel'}
+                          size="md"
+                          showStatus={false}
+                        />
+                      </div>
+                    </div>
+                    {channel.is_official && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center border-2 border-background">
+                        <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-1">
+                      <h3 className="font-display font-semibold text-foreground">
+                        {channel.name}
+                      </h3>
+                      {channel.is_official && (
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {formatFollowers(channel.followers_count || 0)} pengikut
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <Users className="w-4 h-4" />
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {contactStatuses.length === 0 && myStatuses.length === 0 && channels.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-6">
               <Eye className="w-12 h-12 text-primary" />

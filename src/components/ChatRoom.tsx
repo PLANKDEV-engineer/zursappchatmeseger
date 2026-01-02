@@ -12,6 +12,7 @@ import {
   Send,
   BarChart3,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
@@ -20,11 +21,12 @@ import { useMessages } from '@/hooks/useMessages';
 import { useTyping } from '@/hooks/useTyping';
 import { useBlocking } from '@/hooks/useBlocking';
 import { MediaUpload } from '@/components/MediaUpload';
-import { PollCreator } from '@/components/PollCreator';
-import { MessageMenu, ReactionPicker } from '@/components/ChatOptionsMenu';
+import { PollCreator, PollDisplay } from '@/components/PollCreator';
+import { MessageMenu, ChatOptionsMenu, ReactionPicker } from '@/components/ChatOptionsMenu';
 import { ProfileView } from '@/components/ProfileView';
 import { ReportModal } from '@/components/ReportModal';
 import { ForwardModal } from '@/components/ForwardModal';
+import { SwipeableMessage } from '@/components/SwipeableMessage';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface ChatRoomProps {
@@ -53,10 +55,11 @@ export function ChatRoom({
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const [showReactions, setShowReactions] = useState<string | null>(null);
-  const [replyTo, setReplyTo] = useState<{ id: string; content: string } | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName?: string } | null>(null);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showForwardModal, setShowForwardModal] = useState(false);
+  const [showChatOptions, setShowChatOptions] = useState(false);
   const [forwardMessageContent, setForwardMessageContent] = useState('');
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -88,8 +91,34 @@ export function ChatRoom({
   };
 
   const handlePollCreate = async (question: string, options: string[]) => {
-    const pollData = JSON.stringify({ question, options, votes: options.map(() => 0) });
+    const pollData = JSON.stringify({ question, options, votes: options.map(() => 0), voters: options.map(() => []) });
     await sendMessage(pollData, 'poll');
+  };
+
+  const handlePollVote = async (messageId: string, optionIndex: number) => {
+    const message = messages.find(m => m.id === messageId);
+    if (!message?.content) return;
+    
+    try {
+      const pollData = JSON.parse(message.content);
+      
+      // Check if user already voted
+      const alreadyVoted = pollData.voters?.some((voters: string[]) => voters?.includes(userId));
+      if (alreadyVoted) return;
+      
+      // Update votes
+      pollData.votes[optionIndex] = (pollData.votes[optionIndex] || 0) + 1;
+      if (!pollData.voters) pollData.voters = pollData.options.map(() => []);
+      pollData.voters[optionIndex] = [...(pollData.voters[optionIndex] || []), userId];
+      
+      // Update message content
+      await supabase
+        .from('messages')
+        .update({ content: JSON.stringify(pollData) })
+        .eq('id', messageId);
+    } catch (e) {
+      console.error('Error voting on poll:', e);
+    }
   };
 
   const formatTime = (date: string) => {
@@ -175,8 +204,74 @@ export function ChatRoom({
     setForwardMessageContent('');
     setShowForwardModal(false);
   };
+
+  const handleSwipeReply = (message: any) => {
+    setReplyTo({
+      id: message.id,
+      content: message.content || '',
+      senderName: message.senderProfile?.name
+    });
+  };
   
   const canSendMessage = !chat.only_admins_can_send || isUserAdmin;
+
+  const renderMessageContent = (message: any) => {
+    // Handle poll type
+    if (message.type === 'poll' && message.content) {
+      try {
+        const pollData = JSON.parse(message.content);
+        const userVoteIndex = pollData.voters?.findIndex((voters: string[]) => voters?.includes(userId));
+        const totalVotes = pollData.votes?.reduce((a: number, b: number) => a + b, 0) || 0;
+        
+        return (
+          <PollDisplay
+            question={pollData.question}
+            options={pollData.options.map((opt: string, i: number) => ({
+              text: opt,
+              votes: pollData.votes[i] || 0,
+              voters: pollData.voters?.[i] || []
+            }))}
+            totalVotes={totalVotes}
+            userVote={userVoteIndex >= 0 ? userVoteIndex : undefined}
+            onVote={(idx) => handlePollVote(message.id, idx)}
+          />
+        );
+      } catch {
+        return <p className="text-sm">{message.content}</p>;
+      }
+    }
+    
+    // Handle image type
+    if (message.type === 'image' && message.media_url) {
+      return (
+        <div className="max-w-[250px]">
+          <img 
+            src={message.media_url} 
+            alt="Shared image" 
+            className="rounded-lg w-full"
+          />
+          {message.content && <p className="text-sm mt-2">{message.content}</p>}
+        </div>
+      );
+    }
+    
+    // Handle video type
+    if (message.type === 'video' && message.media_url) {
+      return (
+        <div className="max-w-[250px]">
+          <video 
+            src={message.media_url} 
+            controls
+            className="rounded-lg w-full"
+          />
+          {message.content && <p className="text-sm mt-2">{message.content}</p>}
+        </div>
+      );
+    }
+    
+    // Default text
+    return <p className="text-sm">{message.content}</p>;
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -210,7 +305,9 @@ export function ChatRoom({
                     ? (otherUserProfile?.is_online 
                         ? 'Online' 
                         : `Terakhir dilihat ${formatLastSeen(otherUserProfile?.last_seen)}`)
-                    : `${chat.type === 'channel' ? 'Saluran' : 'Grup'}`
+                    : chat.type === 'channel'
+                      ? `${chat.followers_count || 0} pengikut`
+                      : 'Grup'
                 }
               </p>
             </div>
@@ -223,7 +320,7 @@ export function ChatRoom({
             <Button variant="ghost" size="icon-sm" onClick={onCall}>
               <Phone className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={onInfo}>
+            <Button variant="ghost" size="icon-sm" onClick={() => setShowChatOptions(true)}>
               <MoreVertical className="w-5 h-5" />
             </Button>
           </div>
@@ -245,53 +342,81 @@ export function ChatRoom({
             const isMe = message.sender_id === userId;
 
             return (
-              <motion.div
+              <SwipeableMessage
                 key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
+                isMe={isMe}
+                onSwipeReply={() => handleSwipeReply(message)}
               >
-                {!isMe && (
-                  <Avatar
-                    src={message.senderProfile?.avatar_url || undefined}
-                    name={message.senderProfile?.name}
-                    size="xs"
-                    showStatus={false}
-                  />
-                )}
-
-                <div
-                  className={`max-w-[75%] ${isMe ? 'message-sent' : 'message-received'} px-4 py-2 relative`}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setSelectedMessage(message.id);
-                  }}
-                  onClick={() => setSelectedMessage(message.id)}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
                 >
-                  {!isMe && chat.type !== 'private' && (
-                    <p className="text-xs font-medium text-primary mb-1">
-                      {message.senderProfile?.name}
-                    </p>
+                  {!isMe && (
+                    <Avatar
+                      src={message.senderProfile?.avatar_url || undefined}
+                      name={message.senderProfile?.name}
+                      size="xs"
+                      showStatus={false}
+                    />
                   )}
-                  <p className="text-sm">{message.content}</p>
-                  <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <span className="text-[10px] opacity-70">
-                      {formatTime(message.created_at)}
-                    </span>
-                  </div>
 
-                  {/* Reactions */}
-                  {message.reactions && message.reactions.length > 0 && (
-                    <div className="flex gap-1 mt-1 flex-wrap">
-                      {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => (
-                        <span key={emoji} className="text-xs bg-muted px-1.5 py-0.5 rounded-full">
-                          {emoji} {message.reactions?.filter(r => r.emoji === emoji).length}
-                        </span>
-                      ))}
+                  <div
+                    className={`max-w-[75%] ${isMe ? 'message-sent' : 'message-received'} px-4 py-2 relative`}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setSelectedMessage(message.id);
+                    }}
+                    onClick={() => {
+                      if (message.type !== 'poll') {
+                        setSelectedMessage(message.id);
+                      }
+                    }}
+                  >
+                    {!isMe && chat.type !== 'private' && (
+                      <p className="text-xs font-medium text-primary mb-1">
+                        {message.senderProfile?.name}
+                      </p>
+                    )}
+                    
+                    {/* Reply preview */}
+                    {message.reply_to_id && (
+                      <div className="mb-2 p-2 rounded bg-muted/50 border-l-2 border-primary">
+                        <p className="text-xs text-primary">Membalas</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {messages.find(m => m.id === message.reply_to_id)?.content || 'Pesan'}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {renderMessageContent(message)}
+                    
+                    <div className={`flex items-center gap-1 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <span className="text-[10px] opacity-70">
+                        {formatTime(message.created_at)}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </motion.div>
+
+                    {/* Reactions */}
+                    {message.reactions && message.reactions.length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => (
+                          <button
+                            key={emoji}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addReaction(message.id, emoji);
+                            }}
+                            className="text-xs bg-muted hover:bg-muted/80 px-1.5 py-0.5 rounded-full transition-colors"
+                          >
+                            {emoji} {message.reactions?.filter(r => r.emoji === emoji).length}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </SwipeableMessage>
             );
           })
         )}
@@ -301,15 +426,24 @@ export function ChatRoom({
       </main>
 
       {/* Reply Preview */}
-      {replyTo && (
-        <div className="px-4 py-2 bg-card border-t border-border flex items-center gap-2">
-          <div className="flex-1 p-2 bg-muted rounded-lg">
-            <p className="text-xs text-primary">Membalas</p>
-            <p className="text-sm text-muted-foreground line-clamp-1">{replyTo.content}</p>
-          </div>
-          <button onClick={() => setReplyTo(null)} className="p-2">×</button>
-        </div>
-      )}
+      <AnimatePresence>
+        {replyTo && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="px-4 py-2 bg-card border-t border-border flex items-center gap-2"
+          >
+            <div className="flex-1 p-2 bg-muted rounded-lg border-l-2 border-primary">
+              <p className="text-xs text-primary">Membalas {replyTo.senderName || ''}</p>
+              <p className="text-sm text-muted-foreground line-clamp-1">{replyTo.content}</p>
+            </div>
+            <Button variant="ghost" size="icon-sm" onClick={() => setReplyTo(null)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input Bar */}
       {canSendMessage ? (
@@ -369,13 +503,39 @@ export function ChatRoom({
         onCreatePoll={handlePollCreate}
       />
 
+      {/* Chat Options Menu (3-dot menu) */}
+      {chat.type === 'private' && otherUserProfile && (
+        <ChatOptionsMenu
+          isOpen={showChatOptions}
+          onClose={() => setShowChatOptions(false)}
+          onViewProfile={() => {
+            setShowChatOptions(false);
+            setShowProfileView(true);
+          }}
+          onDeleteChat={() => {
+            setShowChatOptions(false);
+            // TODO: Implement delete chat
+          }}
+          onBlock={() => {
+            setShowChatOptions(false);
+            handleBlock();
+          }}
+          onReport={() => {
+            setShowChatOptions(false);
+            setShowReportModal(true);
+          }}
+          userName={otherUserProfile?.name || chat.name || 'User'}
+          isBlocked={isBlocked(otherUserProfile?.user_id)}
+        />
+      )}
+
       {/* Message Menu */}
       <MessageMenu
         isOpen={!!selectedMessage}
         onClose={() => setSelectedMessage(null)}
         onReply={() => {
           const msg = messages.find(m => m.id === selectedMessage);
-          if (msg) setReplyTo({ id: msg.id, content: msg.content || '' });
+          if (msg) setReplyTo({ id: msg.id, content: msg.content || '', senderName: msg.senderProfile?.name });
           setSelectedMessage(null);
         }}
         onReact={() => setShowReactions(selectedMessage)}
@@ -399,6 +559,23 @@ export function ChatRoom({
         isOwnMessage={messages.find(m => m.id === selectedMessage)?.sender_id === userId}
         messageContent={messages.find(m => m.id === selectedMessage)?.content || ''}
       />
+
+      {/* Reaction Picker */}
+      {showReactions && (
+        <div className="fixed inset-0 z-50" onClick={() => setShowReactions(null)}>
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2">
+            <ReactionPicker
+              isOpen={true}
+              onClose={() => setShowReactions(null)}
+              onSelect={(emoji) => {
+                addReaction(showReactions, emoji);
+                setShowReactions(null);
+                setSelectedMessage(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Profile View Modal */}
       {otherUserProfile && (
