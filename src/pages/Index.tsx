@@ -20,6 +20,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { BlockedScreen } from '@/components/BlockedScreen';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import { useChats, type ChatWithDetails } from '@/hooks/useChats';
 import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 import { useCalls } from '@/hooks/useCalls';
@@ -41,6 +42,7 @@ function LoadingScreen() {
 
 function AppContent() {
   const { user, profile, loading, isAdmin, isBlocked, blockInfo } = useAuth();
+  const { toast } = useToast();
   const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
@@ -143,12 +145,29 @@ function AppContent() {
   };
 
   const handleCreateChat = async (otherUserId: string) => {
-    const { data } = await createPrivateChat(otherUserId);
+    const { data, error } = await createPrivateChat(otherUserId);
+
+    if (error) {
+      toast({
+        title: 'Gagal membuka chat',
+        description: error.message || 'Terjadi kesalahan saat membuat chat',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (data) {
       setSelectedChat(data);
       setCurrentView('chatroom');
       setShowAddContact(false);
+      return;
     }
+
+    toast({
+      title: 'Chat tidak ditemukan',
+      description: 'Tidak bisa membuka chat dengan pengguna tersebut.',
+      variant: 'destructive',
+    });
   };
 
   const handleCreateGroup = async (name: string, participantIds: string[], isChannel?: boolean) => {

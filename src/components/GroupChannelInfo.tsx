@@ -80,12 +80,12 @@ export function GroupChannelInfo({
 
       // Fetch profiles for all participants
       const participantsWithProfiles: Participant[] = [];
-      for (const p of participantsData || []) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name, phone, avatar_url, is_online, public_id')
-          .eq('user_id', p.user_id)
-          .single();
+        for (const p of participantsData || []) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name, phone, avatar_url, is_online, public_id')
+            .eq('user_id', p.user_id)
+            .maybeSingle();
 
         const participant: Participant = {
           ...p,
@@ -395,7 +395,10 @@ export function GroupChannelInfo({
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => onChatWithUser(participant.user_id)}
+                          onClick={() => {
+                            onChatWithUser(participant.user_id);
+                            onClose();
+                          }}
                           title="Chat Pribadi"
                         >
                           <MessageCircle className="w-4 h-4 text-primary" />
@@ -482,7 +485,11 @@ export function GroupChannelInfo({
 
                   <div className="space-y-2">
                     <button
-                      onClick={() => onChatWithUser(selectedParticipant.user_id)}
+                      onClick={() => {
+                        onChatWithUser(selectedParticipant.user_id);
+                        setShowMemberMenu(false);
+                        onClose();
+                      }}
                       className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-muted transition-colors"
                     >
                       <MessageCircle className="w-5 h-5" />

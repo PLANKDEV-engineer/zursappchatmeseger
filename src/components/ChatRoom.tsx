@@ -325,7 +325,7 @@ export function ChatRoom({
             <ArrowLeft className="w-5 h-5" />
           </Button>
 
-          <button onClick={() => chat.type === 'private' ? setShowProfileView(true) : onInfo()} className="flex items-center gap-3 flex-1">
+          <button onClick={() => chat.type === 'private' ? setShowProfileView(true) : setShowGroupInfo(true)} className="flex items-center gap-3 flex-1">
             <Avatar
               src={chat.avatar_url || undefined}
               name={chat.name || undefined}
