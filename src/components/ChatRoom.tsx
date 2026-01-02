@@ -27,6 +27,7 @@ import { ProfileView } from '@/components/ProfileView';
 import { ReportModal } from '@/components/ReportModal';
 import { ForwardModal } from '@/components/ForwardModal';
 import { SwipeableMessage } from '@/components/SwipeableMessage';
+import { GroupChannelInfo } from '@/components/GroupChannelInfo';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface ChatRoomProps {
@@ -60,6 +61,7 @@ export function ChatRoom({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [forwardMessageContent, setForwardMessageContent] = useState('');
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -140,7 +142,10 @@ export function ChatRoom({
   };
 
   const isOfficial = chat.is_official;
+  const isChannel = chat.type === 'channel';
   const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [isUserOwner, setIsUserOwner] = useState(false);
+  const [isGroupClosed, setIsGroupClosed] = useState(chat.is_closed || false);
   
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -152,9 +157,15 @@ export function ChatRoom({
         .eq('user_id', userId)
         .single();
       setIsUserAdmin(data?.is_admin || data?.is_owner || false);
+      setIsUserOwner(data?.is_owner || false);
     };
     checkAdminStatus();
   }, [chat.id, userId]);
+
+  // Also check if chat.is_closed changed
+  useEffect(() => {
+    setIsGroupClosed(chat.is_closed || false);
+  }, [chat.is_closed]);
 
   // Fetch other user profile for private chats
   useEffect(() => {
@@ -213,7 +224,28 @@ export function ChatRoom({
     });
   };
   
-  const canSendMessage = !chat.only_admins_can_send || isUserAdmin;
+  // Logika pengiriman pesan:
+  // 1. Saluran: HANYA admin/owner yang bisa kirim
+  // 2. Grup resmi: HANYA admin/owner yang bisa kirim
+  // 3. Grup biasa tertutup (is_closed): HANYA admin yang bisa kirim
+  // 4. Grup biasa terbuka: semua anggota bisa kirim
+  // 5. Chat pribadi: semua bisa kirim
+  const canSendMessage = (() => {
+    // Saluran: hanya admin/owner
+    if (isChannel) {
+      return isUserAdmin || isUserOwner;
+    }
+    // Grup resmi: hanya admin/owner
+    if (isOfficial && chat.type === 'group') {
+      return isUserAdmin || isUserOwner;
+    }
+    // Grup tertutup: hanya admin
+    if (chat.type === 'group' && (isGroupClosed || chat.only_admins_can_send)) {
+      return isUserAdmin || isUserOwner;
+    }
+    // Default: semua bisa kirim
+    return true;
+  })();
 
   const renderMessageContent = (message: any) => {
     // Handle poll type
@@ -503,7 +535,7 @@ export function ChatRoom({
         onCreatePoll={handlePollCreate}
       />
 
-      {/* Chat Options Menu (3-dot menu) */}
+      {/* Chat Options Menu (3-dot menu) - for private chats */}
       {chat.type === 'private' && otherUserProfile && (
         <ChatOptionsMenu
           isOpen={showChatOptions}
@@ -528,6 +560,55 @@ export function ChatRoom({
           isBlocked={isBlocked(otherUserProfile?.user_id)}
         />
       )}
+
+      {/* Group/Channel Options Menu (3-dot menu) - for groups and channels */}
+      {(chat.type === 'group' || chat.type === 'channel') && showChatOptions && (
+        <div 
+          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50"
+          onClick={() => setShowChatOptions(false)}
+        >
+          <div 
+            className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl border-t border-border p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-4" />
+            <h3 className="text-lg font-display font-bold text-center mb-4">{chat.name}</h3>
+            
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setShowChatOptions(false);
+                  setShowGroupInfo(true);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className="font-medium">Lihat Info {chat.type === 'channel' ? 'Saluran' : 'Grup'}</span>
+              </button>
+            </div>
+            
+            <Button
+              variant="outline"
+              onClick={() => setShowChatOptions(false)}
+              className="w-full mt-4"
+            >
+              Batal
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Group/Channel Info Modal */}
+      <GroupChannelInfo
+        isOpen={showGroupInfo}
+        onClose={() => setShowGroupInfo(false)}
+        chat={chat}
+        userId={userId}
+        onChatWithUser={(targetUserId) => {
+          setShowGroupInfo(false);
+          // Navigate to private chat with this user
+          // This will be handled by the parent component
+        }}
+      />
 
       {/* Message Menu */}
       <MessageMenu
