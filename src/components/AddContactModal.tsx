@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, UserPlus, MessageCircle, Copy, Check } from 'lucide-react';
+import { X, Search, UserPlus, MessageCircle, Copy, Check, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/Avatar';
+import { UserInfoSheet, type UserInfoSheetUser } from '@/components/UserInfoSheet';
 import { useContacts } from '@/hooks/useContacts';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +28,8 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
   const [foundUser, setFoundUser] = useState<any>(null);
   const [isFinding, setIsFinding] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [infoUser, setInfoUser] = useState<UserInfoSheetUser | null>(null);
+  const [showUserInfo, setShowUserInfo] = useState(false);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -243,17 +246,55 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                         onClick={() => handleSelectUser(user)}
                         className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card-hover transition-all"
                       >
-                        <Avatar
-                          src={user.avatar_url}
-                          name={user.name}
-                          size="md"
-                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInfoUser({
+                              user_id: user.user_id,
+                              name: user.name,
+                              phone: user.phone,
+                              avatar_url: user.avatar_url,
+                              public_id: user.public_id,
+                            });
+                            setShowUserInfo(true);
+                          }}
+                          className="rounded-full"
+                          aria-label={`Lihat info akun ${user.name}`}
+                        >
+                          <Avatar
+                            src={user.avatar_url}
+                            name={user.name}
+                            size="md"
+                          />
+                        </button>
                         <div className="text-left flex-1 min-w-0">
                           <h4 className="font-medium text-foreground">{user.name}</h4>
                           <p className="text-sm text-muted-foreground truncate">{user.phone || 'No phone'}</p>
                           <p className="text-xs text-primary/70 font-mono truncate">ID: {user.public_id?.slice(0, 8)}...</p>
                         </div>
-                        <MessageCircle className="w-5 h-5 text-primary" />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInfoUser({
+                                user_id: user.user_id,
+                                name: user.name,
+                                phone: user.phone,
+                                avatar_url: user.avatar_url,
+                                public_id: user.public_id,
+                              });
+                              setShowUserInfo(true);
+                            }}
+                            aria-label={`Info akun ${user.name}`}
+                          >
+                            <Info className="w-4 h-4" />
+                          </Button>
+                          <MessageCircle className="w-5 h-5 text-primary" />
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -277,13 +318,31 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                         onClick={() => handleSelectContact(contact)}
                         className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card-hover transition-all"
                       >
-                        <Avatar
-                          src={contact.profile?.avatar_url || undefined}
-                          name={contact.name}
-                          size="md"
-                          isOnline={contact.profile?.is_online}
-                          showStatus={!!contact.contact_user_id}
-                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!contact.contact_user_id) return;
+                            setInfoUser({
+                              user_id: contact.contact_user_id,
+                              name: contact.name,
+                              phone: contact.phone,
+                              avatar_url: contact.profile?.avatar_url || null,
+                              public_id: contact.profile?.public_id,
+                            });
+                            setShowUserInfo(true);
+                          }}
+                          className="rounded-full"
+                          aria-label={`Lihat info akun ${contact.name}`}
+                        >
+                          <Avatar
+                            src={contact.profile?.avatar_url || undefined}
+                            name={contact.name}
+                            size="md"
+                            isOnline={contact.profile?.is_online}
+                            showStatus={!!contact.contact_user_id}
+                          />
+                        </button>
                         <div className="text-left flex-1 min-w-0">
                           <h4 className="font-medium text-foreground">{contact.name}</h4>
                           <p className="text-sm text-muted-foreground truncate">{contact.phone || 'No phone'}</p>
@@ -293,7 +352,26 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                             </p>
                           )}
                         </div>
-                        <MessageCircle className="w-5 h-5 text-primary" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!contact.contact_user_id) return;
+                            setInfoUser({
+                              user_id: contact.contact_user_id,
+                              name: contact.name,
+                              phone: contact.phone,
+                              avatar_url: contact.profile?.avatar_url || null,
+                              public_id: contact.profile?.public_id,
+                            });
+                            setShowUserInfo(true);
+                          }}
+                          aria-label={`Info akun ${contact.name}`}
+                        >
+                          <Info className="w-4 h-4" />
+                        </Button>
                       </button>
                     ))}
                   </div>
