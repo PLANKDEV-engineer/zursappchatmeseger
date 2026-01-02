@@ -22,6 +22,7 @@ import { TypingIndicator } from '@/components/TypingIndicator';
 import { useMessages } from '@/hooks/useMessages';
 import { useTyping } from '@/hooks/useTyping';
 import { useBlocking } from '@/hooks/useBlocking';
+import { useAuth } from '@/context/AuthContext';
 import { MediaUpload } from '@/components/MediaUpload';
 import { PollCreator, PollDisplay } from '@/components/PollCreator';
 import { MessageMenu, ChatOptionsMenu, ReactionPicker } from '@/components/ChatOptionsMenu';
@@ -52,6 +53,7 @@ export function ChatRoom({
   const { messages, loading, sendMessage, deleteMessage, addReaction } = useMessages(chat.id, userId);
   const { typingUsers, setTyping } = useTyping(chat.id, userId);
   const { isBlocked, blockUser, unblockUser } = useBlocking(userId);
+  const { isAdmin: isAppAdmin } = useAuth();
   
   const [inputValue, setInputValue] = useState('');
   const [showMediaUpload, setShowMediaUpload] = useState(false);
@@ -227,12 +229,17 @@ export function ChatRoom({
   };
   
   // Logika pengiriman pesan:
-  // 1. Saluran: HANYA admin/owner yang bisa kirim
-  // 2. Grup resmi: HANYA admin/owner yang bisa kirim
-  // 3. Grup biasa tertutup (is_closed): HANYA admin yang bisa kirim
-  // 4. Grup biasa terbuka: semua anggota bisa kirim
-  // 5. Chat pribadi: semua bisa kirim
+  // 1. App-level admin (dari user_roles) SELALU bisa kirim ke mana saja
+  // 2. Saluran: HANYA admin/owner yang bisa kirim
+  // 3. Grup resmi: HANYA admin/owner yang bisa kirim
+  // 4. Grup biasa tertutup (is_closed): HANYA admin yang bisa kirim
+  // 5. Grup biasa terbuka: semua anggota bisa kirim
+  // 6. Chat pribadi: semua bisa kirim
   const canSendMessage = (() => {
+    // App-level admin selalu bisa kirim
+    if (isAppAdmin) {
+      return true;
+    }
     // Saluran: hanya admin/owner
     if (isChannel) {
       return isUserAdmin || isUserOwner;

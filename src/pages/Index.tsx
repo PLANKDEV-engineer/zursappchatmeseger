@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { ChatProvider } from '@/context/ChatContext';
 import { AuthPage } from '@/pages/AuthPage';
@@ -92,10 +93,29 @@ function AppContent() {
   }
 
   const handleNavigate = (index: number) => {
-    setActiveNavIndex(index);
-    const path = navItems[index].path as View;
+    // Clamp index to valid range
+    const maxIndex = navItems.length - 1;
+    const clampedIndex = Math.max(0, Math.min(index, maxIndex));
+    setActiveNavIndex(clampedIndex);
+    const path = navItems[clampedIndex].path as View;
     setCurrentView(path);
     setSelectedChat(null);
+  };
+
+  // Swipe handler for navigation
+  const handleSwipe = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const threshold = 50;
+    const velocity = 0.5;
+    
+    if (Math.abs(info.offset.x) > threshold || Math.abs(info.velocity.x) > velocity) {
+      if (info.offset.x > 0) {
+        // Swipe right - go to previous page
+        handleNavigate(activeNavIndex - 1);
+      } else {
+        // Swipe left - go to next page
+        handleNavigate(activeNavIndex + 1);
+      }
+    }
   };
 
   const handleChatSelect = (chat: ChatWithDetails) => {
@@ -165,20 +185,67 @@ function AppContent() {
     setCallInfo(null);
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      {currentView === 'chats' && (
-        <ChatDashboard
-          chats={privateAndGroupChats}
-          onChatSelect={handleChatSelect}
-          onAddContact={() => setShowAddContact(true)}
-          onAddGroup={() => setShowCreateGroup(true)}
-          onAddChannel={() => setShowCreateChannel(true)}
-          onSettings={() => handleNavigate(3)}
-        />
-      )}
+  // Slide variants for page transitions
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (direction: number) => ({
+      x: direction < 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+  };
 
-      {currentView === 'chatroom' && selectedChat && (
+  const [[page, direction], setPage] = useState([0, 0]);
+
+  useEffect(() => {
+    setPage([activeNavIndex, activeNavIndex > page ? 1 : -1]);
+  }, [activeNavIndex]);
+
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'chats':
+        return (
+          <ChatDashboard
+            chats={privateAndGroupChats}
+            onChatSelect={handleChatSelect}
+            onAddContact={() => setShowAddContact(true)}
+            onAddGroup={() => setShowCreateGroup(true)}
+            onAddChannel={() => setShowCreateChannel(true)}
+            onSettings={() => handleNavigate(3)}
+          />
+        );
+      case 'status':
+        return (
+          <StatusPage
+            myStatuses={myStatuses}
+            contactStatuses={contactStatuses}
+            channels={channels}
+            profile={profile}
+            onViewStatus={handleViewStatus}
+            onCreateStatus={() => setShowCreateStatus(true)}
+            onChannelSelect={handleChatSelect}
+          />
+        );
+      case 'calls':
+        return <CallsPage onCall={handleCall} />;
+      case 'settings':
+        return <SettingsPage onEditProfile={() => setShowEditProfile(true)} />;
+      case 'admin':
+        return isAdmin ? <AdminPanel userId={user.id} onBack={() => handleNavigate(0)} /> : null;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background overflow-hidden">
+      {currentView === 'chatroom' && selectedChat ? (
         <ChatRoom
           chat={selectedChat}
           userId={user.id}
@@ -187,28 +254,23 @@ function AppContent() {
           onVideoCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'video')}
           onInfo={() => {}}
         />
-      )}
-
-      {currentView === 'status' && (
-        <StatusPage
-          myStatuses={myStatuses}
-          contactStatuses={contactStatuses}
-          channels={channels}
-          profile={profile}
-          onViewStatus={handleViewStatus}
-          onCreateStatus={() => setShowCreateStatus(true)}
-          onChannelSelect={handleChatSelect}
-        />
-      )}
-
-      {currentView === 'calls' && <CallsPage onCall={handleCall} />}
-
-      {currentView === 'settings' && (
-        <SettingsPage onEditProfile={() => setShowEditProfile(true)} />
-      )}
-
-      {currentView === 'admin' && isAdmin && (
-        <AdminPanel userId={user.id} onBack={() => handleNavigate(0)} />
+      ) : (
+        <motion.div
+          key={currentView}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={handleSwipe}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          variants={slideVariants}
+          custom={direction}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="min-h-screen"
+        >
+          {renderCurrentView()}
+        </motion.div>
       )}
 
       {currentView !== 'chatroom' && currentView !== 'admin' && (
