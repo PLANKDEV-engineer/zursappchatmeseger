@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -99,7 +100,23 @@ export function ChatRoom({
   };
 
   const isOfficial = chat.is_official;
-  const canSendMessage = !chat.only_admins_can_send || chat.participantProfile?.is_admin;
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!userId || !chat.id) return;
+      const { data } = await supabase
+        .from('chat_participants')
+        .select('is_admin, is_owner')
+        .eq('chat_id', chat.id)
+        .eq('user_id', userId)
+        .single();
+      setIsUserAdmin(data?.is_admin || data?.is_owner || false);
+    };
+    checkAdminStatus();
+  }, [chat.id, userId]);
+  
+  const canSendMessage = !chat.only_admins_can_send || isUserAdmin;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
