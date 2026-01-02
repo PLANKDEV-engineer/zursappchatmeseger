@@ -1,7 +1,10 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Plus, Eye, Radio, Users, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Eye, Radio, Users, CheckCircle2, Search, X } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import type { StatusType } from '@/hooks/useStatuses';
 import type { Profile } from '@/context/AuthContext';
 import type { ChatWithDetails } from '@/hooks/useChats';
@@ -41,6 +44,51 @@ export function StatusPage({
   onCreateStatus,
   onChannelSelect
 }: StatusPageProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ChatWithDetails[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+
+  const searchChannels = async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('type', 'channel')
+        .ilike('name', `%${query}%`)
+        .limit(20);
+
+      if (!error && data) {
+        setSearchResults(data.map(c => ({
+          ...c,
+          lastMessage: null,
+          unreadCount: 0
+        })));
+      }
+    } catch (error) {
+      console.error('Error searching channels:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    const debounce = setTimeout(() => {
+      if (searchQuery) {
+        searchChannels(searchQuery);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(debounce);
+  }, [searchQuery]);
+
   const formatTime = (date: string) => {
     const now = new Date();
     const statusDate = new Date(date);
@@ -57,12 +105,123 @@ export function StatusPage({
     <div className="min-h-screen bg-background flex flex-col pb-20">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background-secondary/95 backdrop-blur-xl border-b border-border/50 p-4">
-        <h1 className="text-2xl font-display font-bold text-gradient-primary">
-          Status
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-display font-bold text-gradient-primary">
+            Status
+          </h1>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setShowSearch(!showSearch)}
+          >
+            <Search className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Search Bar */}
+        <AnimatePresence>
+          {showSearch && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden mt-3"
+            >
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Cari saluran..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-12 pr-10"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                  >
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       <main className="flex-1 p-4 space-y-6">
+        {/* Channel Search Results */}
+        {searchQuery && (
+          <section>
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">
+              Hasil Pencarian Saluran
+            </h2>
+            {isSearching ? (
+              <div className="flex justify-center py-4">
+                <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="space-y-2">
+                {searchResults.map((channel, index) => (
+                  <motion.button
+                    key={channel.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => {
+                      onChannelSelect(channel);
+                      setSearchQuery('');
+                      setShowSearch(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-card border border-border/50 hover:bg-card-hover transition-all"
+                  >
+                    <div className="relative">
+                      <div className="p-0.5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500">
+                        <div className="bg-background rounded-full p-0.5">
+                          <Avatar
+                            src={channel.avatar_url || undefined}
+                            name={channel.name || 'Channel'}
+                            size="md"
+                            showStatus={false}
+                          />
+                        </div>
+                      </div>
+                      {channel.is_official && (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center border-2 border-background">
+                          <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-1">
+                        <h3 className="font-display font-semibold text-foreground">
+                          {channel.name}
+                        </h3>
+                        {channel.is_official && (
+                          <CheckCircle2 className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatFollowers(channel.followers_count || 0)} pengikut
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                Tidak ada saluran ditemukan
+              </div>
+            )}
+          </section>
+        )}
+
         {/* My Status */}
         <section>
           <h2 className="text-sm font-medium text-muted-foreground mb-3">
