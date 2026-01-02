@@ -147,8 +147,8 @@ function AppContent() {
     if (data) {
       setSelectedChat(data);
       setCurrentView('chatroom');
+      setShowAddContact(false);
     }
-    setShowAddContact(false);
   };
 
   const handleCreateGroup = async (name: string, participantIds: string[], isChannel?: boolean) => {
@@ -252,6 +252,7 @@ function AppContent() {
           onCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'voice')}
           onVideoCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'video')}
           onInfo={() => {}}
+          onChatWithUser={handleCreateChat}
         />
       ) : (
         <motion.div
