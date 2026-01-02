@@ -13,6 +13,8 @@ import {
   BarChart3,
   CheckCircle2,
   X,
+  Check,
+  CheckCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
@@ -427,6 +429,23 @@ export function ChatRoom({
                       <span className="text-[10px] opacity-70">
                         {formatTime(message.created_at)}
                       </span>
+                      {/* Read receipts - only for own messages in private chats */}
+                      {isMe && chat.type === 'private' && (
+                        <>
+                          {message.status === 'sending' && (
+                            <div className="w-3 h-3 rounded-full border border-muted-foreground border-t-transparent animate-spin" />
+                          )}
+                          {message.status === 'sent' && (
+                            <Check className="w-3.5 h-3.5 text-muted-foreground" />
+                          )}
+                          {message.status === 'delivered' && (
+                            <CheckCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                          )}
+                          {message.status === 'read' && (
+                            <CheckCheck className="w-3.5 h-3.5 text-primary" />
+                          )}
+                        </>
+                      )}
                     </div>
 
                     {/* Reactions */}

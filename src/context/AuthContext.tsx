@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 
 export type Profile = Tables<'profiles'>;
+export type AdminBlock = Tables<'admin_blocks'>;
 
 interface AuthContextType {
   user: User | null;
@@ -11,11 +12,14 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  isBlocked: boolean;
+  blockInfo: AdminBlock | null;
   signUp: (email: string, password: string, name: string) => Promise<{ data: any; error: any }>;
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>;
   signOut: () => Promise<{ error: any }>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ data: any; error: any }>;
   refreshProfile: () => void;
+  submitAppeal: (message: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockInfo, setBlockInfo] = useState<AdminBlock | null>(null);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -46,6 +52,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       
       setIsAdmin(roleData?.role === 'admin');
+
+      // Check if user is blocked by admin
+      const { data: blockData } = await supabase
+        .from('admin_blocks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
+      
+      if (blockData) {
+        // Check if block has expired
+        if (blockData.expires_at && new Date(blockData.expires_at) < new Date()) {
+          // Block has expired, update status
+          await supabase
+            .from('admin_blocks')
+            .update({ status: 'expired' })
+            .eq('id', blockData.id);
+          setIsBlocked(false);
+          setBlockInfo(null);
+        } else {
+          setIsBlocked(true);
+          setBlockInfo(blockData);
+        }
+      } else {
+        setIsBlocked(false);
+        setBlockInfo(null);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
@@ -66,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
           setIsAdmin(false);
+          setIsBlocked(false);
+          setBlockInfo(null);
         }
         setLoading(false);
       }
@@ -116,6 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(null);
       setProfile(null);
       setIsAdmin(false);
+      setIsBlocked(false);
+      setBlockInfo(null);
     }
     return { error };
   };
@@ -143,6 +180,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const submitAppeal = async (message: string) => {
+    if (!blockInfo) return { error: new Error('No block found') };
+    
+    const { error } = await supabase
+      .from('admin_blocks')
+      .update({ 
+        appeal_message: message, 
+        appeal_status: 'pending' 
+      })
+      .eq('id', blockInfo.id);
+    
+    if (!error) {
+      setBlockInfo({ ...blockInfo, appeal_message: message, appeal_status: 'pending' });
+    }
+    
+    return { error };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -151,11 +206,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAdmin,
+        isBlocked,
+        blockInfo,
         signUp,
         signIn,
         signOut,
         updateProfile,
         refreshProfile,
+        submitAppeal,
       }}
     >
       {children}

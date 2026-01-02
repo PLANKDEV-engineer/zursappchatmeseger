@@ -56,13 +56,25 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
       
       setMessages(messagesWithProfiles);
       
-      // Mark messages as read
+      // Mark messages as read and update status to 'read' for sender
       if (userId) {
         await supabase
           .from('chat_participants')
           .update({ unread_count: 0 })
           .eq('chat_id', chatId)
           .eq('user_id', userId);
+        
+        // Update message status to 'read' for messages from other users
+        const unreadMessageIds = messagesWithProfiles
+          .filter(m => m.sender_id !== userId && m.status !== 'read')
+          .map(m => m.id);
+        
+        if (unreadMessageIds.length > 0) {
+          await supabase
+            .from('messages')
+            .update({ status: 'read' })
+            .in('id', unreadMessageIds);
+        }
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
