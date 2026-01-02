@@ -42,23 +42,17 @@ function LoadingScreen() {
 function AppContent() {
   const { user, profile, loading, isAdmin, isBlocked, blockInfo } = useAuth();
   const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
-  
-  // Filter channels from chat list - channels only appear in Status page
-  const privateAndGroupChats = chats.filter(c => c.type !== 'channel');
-  const channels = chats.filter(c => c.type === 'channel');
-  
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
   
   // Initialize presence tracking
   usePresence(user?.id);
   
+  // ALL useState hooks MUST be called before any early returns
   const [currentView, setCurrentView] = useState<View>('chats');
   const [activeNavIndex, setActiveNavIndex] = useState(0);
   const [selectedChat, setSelectedChat] = useState<ChatWithDetails | null>(null);
   const [selectedUserStatuses, setSelectedUserStatuses] = useState<StatusType[]>([]);
-
-  // Modal states
   const [showAddContact, setShowAddContact] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -67,6 +61,11 @@ function AppContent() {
   const [showStatusViewer, setShowStatusViewer] = useState(false);
   const [showCallScreen, setShowCallScreen] = useState(false);
   const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
+  const [[page, direction], setPage] = useState([0, 0]);
+
+  // Filter channels from chat list - channels only appear in Status page
+  const privateAndGroupChats = chats.filter(c => c.type !== 'channel');
+  const channels = chats.filter(c => c.type === 'channel');
 
   // Calculate total unread messages for badge
   const totalUnread = privateAndGroupChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
@@ -79,6 +78,12 @@ function AppContent() {
     ...(isAdmin ? [{ icon: Shield, label: 'Admin', path: 'admin' }] : []),
   ];
 
+  // useEffect MUST be called before any early returns
+  useEffect(() => {
+    setPage([activeNavIndex, activeNavIndex > page ? 1 : -1]);
+  }, [activeNavIndex, page]);
+
+  // Early returns AFTER all hooks
   if (loading) {
     return <LoadingScreen />;
   }
@@ -200,12 +205,6 @@ function AppContent() {
       opacity: 0,
     }),
   };
-
-  const [[page, direction], setPage] = useState([0, 0]);
-
-  useEffect(() => {
-    setPage([activeNavIndex, activeNavIndex > page ? 1 : -1]);
-  }, [activeNavIndex]);
 
   const renderCurrentView = () => {
     switch (currentView) {
