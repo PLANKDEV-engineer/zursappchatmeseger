@@ -359,30 +359,25 @@ export function GroupChannelInfo({
                       key={participant.id}
                       className="flex items-center gap-3 p-3 bg-card rounded-xl"
                     >
-                      <button
-                        onClick={() => {
-                          if (participant.user_id !== userId) {
-                            onChatWithUser(participant.user_id);
-                          }
-                        }}
-                      >
-                        <Avatar
-                          src={participant.profile?.avatar_url || undefined}
-                          name={participant.profile?.name}
-                          size="sm"
-                          showStatus={participant.profile?.is_online}
-                        />
-                      </button>
+                      <Avatar
+                        src={participant.profile?.avatar_url || undefined}
+                        name={participant.profile?.name}
+                        size="sm"
+                        showStatus={participant.profile?.is_online}
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium truncate">
                             {participant.profile?.name || 'Unknown'}
+                            {participant.user_id === userId && (
+                              <span className="text-xs text-muted-foreground ml-1">(Anda)</span>
+                            )}
                           </p>
                           {participant.is_owner && (
-                            <Crown className="w-4 h-4 text-yellow-500" />
+                            <Crown className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                           )}
                           {participant.is_admin && !participant.is_owner && (
-                            <Shield className="w-4 h-4 text-primary" />
+                            <Shield className="w-4 h-4 text-primary flex-shrink-0" />
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -395,7 +390,19 @@ export function GroupChannelInfo({
                         </p>
                       </div>
 
-                      {/* Actions for admins */}
+                      {/* Chat button for other users */}
+                      {participant.user_id !== userId && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => onChatWithUser(participant.user_id)}
+                          title="Chat Pribadi"
+                        >
+                          <MessageCircle className="w-4 h-4 text-primary" />
+                        </Button>
+                      )}
+
+                      {/* Actions menu for admins (to manage other non-owner members) */}
                       {isUserAdmin && participant.user_id !== userId && !participant.is_owner && (
                         <Button
                           variant="ghost"
@@ -404,18 +411,9 @@ export function GroupChannelInfo({
                             setSelectedParticipant(participant);
                             setShowMemberMenu(true);
                           }}
+                          title="Menu Admin"
                         >
                           <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      )}
-
-                      {participant.user_id !== userId && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => onChatWithUser(participant.user_id)}
-                        >
-                          <MessageCircle className="w-4 h-4" />
                         </Button>
                       )}
                     </div>

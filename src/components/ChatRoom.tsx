@@ -40,6 +40,7 @@ interface ChatRoomProps {
   onCall: () => void;
   onVideoCall: () => void;
   onInfo: () => void;
+  onChatWithUser?: (userId: string) => void;
 }
 
 export function ChatRoom({
@@ -49,6 +50,7 @@ export function ChatRoom({
   onCall,
   onVideoCall,
   onInfo,
+  onChatWithUser,
 }: ChatRoomProps) {
   const { messages, loading, sendMessage, deleteMessage, addReaction } = useMessages(chat.id, userId);
   const { typingUsers, setTyping } = useTyping(chat.id, userId);
@@ -631,8 +633,9 @@ export function ChatRoom({
         userId={userId}
         onChatWithUser={(targetUserId) => {
           setShowGroupInfo(false);
-          // Navigate to private chat with this user
-          // This will be handled by the parent component
+          if (onChatWithUser) {
+            onChatWithUser(targetUserId);
+          }
         }}
       />
 
