@@ -16,6 +16,7 @@ import { StatusViewer } from '@/components/StatusViewer';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { CallScreen } from '@/components/CallScreen';
 import { BottomNav } from '@/components/BottomNav';
+import { BlockedScreen } from '@/components/BlockedScreen';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useChats, type ChatWithDetails } from '@/hooks/useChats';
@@ -38,7 +39,7 @@ function LoadingScreen() {
 }
 
 function AppContent() {
-  const { user, profile, loading, isAdmin } = useAuth();
+  const { user, profile, loading, isAdmin, isBlocked, blockInfo } = useAuth();
   const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
   
   // Filter channels from chat list - channels only appear in Status page
@@ -66,8 +67,11 @@ function AppContent() {
   const [showCallScreen, setShowCallScreen] = useState(false);
   const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
 
+  // Calculate total unread messages for badge
+  const totalUnread = privateAndGroupChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
+
   const navItems = [
-    { icon: MessageCircle, label: 'Chats', path: 'chats' },
+    { icon: MessageCircle, label: 'Chats', path: 'chats', badge: totalUnread > 0 ? totalUnread : undefined },
     { icon: Radio, label: 'Status', path: 'status' },
     { icon: Phone, label: 'Calls', path: 'calls' },
     { icon: Settings, label: 'Settings', path: 'settings' },
@@ -80,6 +84,11 @@ function AppContent() {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  // Show blocked screen if user is blocked by admin
+  if (isBlocked && blockInfo) {
+    return <BlockedScreen blockInfo={blockInfo} />;
   }
 
   const handleNavigate = (index: number) => {
