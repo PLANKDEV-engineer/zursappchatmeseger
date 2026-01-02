@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ChatProvider } from '@/context/ChatContext';
@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useChats, type ChatWithDetails } from '@/hooks/useChats';
 import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 import { useCalls } from '@/hooks/useCalls';
+import { usePresence } from '@/hooks/usePresence';
 
 type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
 
@@ -41,6 +42,9 @@ function AppContent() {
   const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
+  
+  // Initialize presence tracking
+  usePresence(user?.id);
   
   const [currentView, setCurrentView] = useState<View>('chats');
   const [activeNavIndex, setActiveNavIndex] = useState(0);
