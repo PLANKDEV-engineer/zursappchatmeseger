@@ -18,9 +18,13 @@ import { Avatar } from '@/components/Avatar';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { useMessages } from '@/hooks/useMessages';
 import { useTyping } from '@/hooks/useTyping';
+import { useBlocking } from '@/hooks/useBlocking';
 import { MediaUpload } from '@/components/MediaUpload';
 import { PollCreator } from '@/components/PollCreator';
 import { MessageMenu, ReactionPicker } from '@/components/ChatOptionsMenu';
+import { ProfileView } from '@/components/ProfileView';
+import { ReportModal } from '@/components/ReportModal';
+import { ForwardModal } from '@/components/ForwardModal';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface ChatRoomProps {
@@ -42,12 +46,19 @@ export function ChatRoom({
 }: ChatRoomProps) {
   const { messages, loading, sendMessage, deleteMessage, addReaction } = useMessages(chat.id, userId);
   const { typingUsers, setTyping } = useTyping(chat.id, userId);
+  const { isBlocked, blockUser, unblockUser } = useBlocking(userId);
+  
   const [inputValue, setInputValue] = useState('');
   const [showMediaUpload, setShowMediaUpload] = useState(false);
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const [showReactions, setShowReactions] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string } | null>(null);
+  const [showProfileView, setShowProfileView] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [forwardMessageContent, setForwardMessageContent] = useState('');
+  const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -115,6 +126,55 @@ export function ChatRoom({
     };
     checkAdminStatus();
   }, [chat.id, userId]);
+
+  // Fetch other user profile for private chats
+  useEffect(() => {
+    const fetchOtherUserProfile = async () => {
+      if (chat.type !== 'private') return;
+      
+      const { data: participants } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('chat_id', chat.id)
+        .neq('user_id', userId);
+      
+      if (participants && participants.length > 0) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', participants[0].user_id)
+          .single();
+        
+        if (profile) {
+          setOtherUserProfile(profile);
+        }
+      }
+    };
+    fetchOtherUserProfile();
+  }, [chat.id, chat.type, userId]);
+
+  const handleBlock = async () => {
+    if (!otherUserProfile) return;
+    if (isBlocked(otherUserProfile.user_id)) {
+      await unblockUser(otherUserProfile.user_id);
+    } else {
+      await blockUser(otherUserProfile.user_id);
+    }
+  };
+
+  const handleForwardMessage = async (chatIds: string[]) => {
+    for (const chatId of chatIds) {
+      await supabase.from('messages').insert({
+        chat_id: chatId,
+        sender_id: userId,
+        content: forwardMessageContent,
+        type: 'text',
+        status: 'sent',
+      });
+    }
+    setForwardMessageContent('');
+    setShowForwardModal(false);
+  };
   
   const canSendMessage = !chat.only_admins_can_send || isUserAdmin;
 
@@ -127,7 +187,7 @@ export function ChatRoom({
             <ArrowLeft className="w-5 h-5" />
           </Button>
 
-          <button onClick={onInfo} className="flex items-center gap-3 flex-1">
+          <button onClick={() => chat.type === 'private' ? setShowProfileView(true) : onInfo()} className="flex items-center gap-3 flex-1">
             <Avatar
               src={chat.avatar_url || undefined}
               name={chat.name || undefined}
@@ -147,7 +207,9 @@ export function ChatRoom({
                 {typingUsers.length > 0 
                   ? `${typingUsers[0]?.name || 'Seseorang'} sedang mengetik...`
                   : chat.type === 'private' 
-                    ? 'Online' 
+                    ? (otherUserProfile?.is_online 
+                        ? 'Online' 
+                        : `Terakhir dilihat ${formatLastSeen(otherUserProfile?.last_seen)}`)
                     : `${chat.type === 'channel' ? 'Saluran' : 'Grup'}`
                 }
               </p>
@@ -314,18 +376,67 @@ export function ChatRoom({
         onReply={() => {
           const msg = messages.find(m => m.id === selectedMessage);
           if (msg) setReplyTo({ id: msg.id, content: msg.content || '' });
+          setSelectedMessage(null);
         }}
         onReact={() => setShowReactions(selectedMessage)}
         onCopy={() => {
           const msg = messages.find(m => m.id === selectedMessage);
           if (msg?.content) navigator.clipboard.writeText(msg.content);
+          setSelectedMessage(null);
         }}
-        onForward={() => {}}
+        onForward={() => {
+          const msg = messages.find(m => m.id === selectedMessage);
+          if (msg?.content) {
+            setForwardMessageContent(msg.content);
+            setShowForwardModal(true);
+          }
+          setSelectedMessage(null);
+        }}
         onDelete={(forEveryone) => {
           if (selectedMessage) deleteMessage(selectedMessage, forEveryone);
+          setSelectedMessage(null);
         }}
         isOwnMessage={messages.find(m => m.id === selectedMessage)?.sender_id === userId}
         messageContent={messages.find(m => m.id === selectedMessage)?.content || ''}
+      />
+
+      {/* Profile View Modal */}
+      {otherUserProfile && (
+        <ProfileView
+          isOpen={showProfileView}
+          onClose={() => setShowProfileView(false)}
+          profile={otherUserProfile}
+          isBlocked={isBlocked(otherUserProfile.user_id)}
+          isOfficial={chat.is_official || false}
+          onCall={onCall}
+          onVideoCall={onVideoCall}
+          onBlock={handleBlock}
+          onReport={() => {
+            setShowProfileView(false);
+            setShowReportModal(true);
+          }}
+          onDeleteChat={() => {}}
+        />
+      )}
+
+      {/* Report Modal */}
+      {otherUserProfile && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          reportedUserId={otherUserProfile.user_id}
+          reportedUserName={otherUserProfile.name}
+          userId={userId}
+        />
+      )}
+
+      {/* Forward Modal */}
+      <ForwardModal
+        isOpen={showForwardModal}
+        onClose={() => setShowForwardModal(false)}
+        onForward={handleForwardMessage}
+        messageContent={forwardMessageContent}
+        userId={userId}
       />
     </div>
   );
