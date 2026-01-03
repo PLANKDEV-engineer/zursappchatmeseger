@@ -110,6 +110,50 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_blocks: {
+        Row: {
+          blocked_at: string
+          blocked_by: string | null
+          chat_id: string
+          duration_hours: number | null
+          expires_at: string | null
+          id: string
+          lifted_at: string | null
+          reason: string
+          status: string
+        }
+        Insert: {
+          blocked_at?: string
+          blocked_by?: string | null
+          chat_id: string
+          duration_hours?: number | null
+          expires_at?: string | null
+          id?: string
+          lifted_at?: string | null
+          reason: string
+          status?: string
+        }
+        Update: {
+          blocked_at?: string
+          blocked_by?: string | null
+          chat_id?: string
+          duration_hours?: number | null
+          expires_at?: string | null
+          id?: string
+          lifted_at?: string | null
+          reason?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_blocks_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_participants: {
         Row: {
           chat_id: string
@@ -150,6 +194,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "chat_participants_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_reports: {
+        Row: {
+          chat_id: string
+          created_at: string
+          description: string | null
+          id: string
+          reason: string
+          reporter_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          chat_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason: string
+          reporter_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason?: string
+          reporter_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_reports_chat_id_fkey"
             columns: ["chat_id"]
             isOneToOne: false
             referencedRelation: "chats"

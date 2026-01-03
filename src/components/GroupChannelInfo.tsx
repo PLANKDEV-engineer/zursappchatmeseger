@@ -15,10 +15,14 @@ import {
   CheckCircle2,
   MessageCircle,
   MoreVertical,
+  Settings,
+  Flag,
 } from 'lucide-react';
 import { UserInfoSheet, UserInfoSheetUser } from '@/components/UserInfoSheet';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
+import { GroupSettingsModal } from '@/components/GroupSettingsModal';
+import { ReportChatModal } from '@/components/ReportChatModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { ChatWithDetails } from '@/hooks/useChats';
@@ -59,12 +63,15 @@ export function GroupChannelInfo({
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [showMemberMenu, setShowMemberMenu] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [chatData, setChatData] = useState(chat);
 
   // For viewing user info sheet
   const [showUserInfo, setShowUserInfo] = useState(false);
   const [userInfoData, setUserInfoData] = useState<UserInfoSheetUser | null>(null);
 
-  const isChannel = chat.type === 'channel';
+  const isChannel = chatData.type === 'channel';
   const isOfficial = chat.is_official;
 
   useEffect(() => {
@@ -198,15 +205,28 @@ export function GroupChannelInfo({
   };
 
   const toggleGroupClosed = async () => {
+    const newState = !chatData.is_closed;
     const { error } = await supabase
       .from('chats')
-      .update({ is_closed: !chat.is_closed })
-      .eq('id', chat.id);
+      .update({ is_closed: newState })
+      .eq('id', chatData.id);
 
     if (error) {
       toast.error('Gagal mengubah pengaturan');
     } else {
-      toast.success(chat.is_closed ? 'Grup dibuka' : 'Grup ditutup');
+      setChatData({ ...chatData, is_closed: newState });
+      toast.success(newState ? 'Grup ditutup' : 'Grup dibuka');
+    }
+  };
+
+  const refreshChatData = async () => {
+    const { data } = await supabase
+      .from('chats')
+      .select('*')
+      .eq('id', chatData.id)
+      .single();
+    if (data) {
+      setChatData({ ...chatData, ...data });
     }
   };
 
@@ -258,27 +278,27 @@ export function GroupChannelInfo({
           {/* Chat Info */}
           <div className="p-6 flex flex-col items-center border-b border-border">
             <Avatar
-              src={chat.avatar_url || undefined}
-              name={chat.name || undefined}
+              src={chatData.avatar_url || undefined}
+              name={chatData.name || undefined}
               size="xl"
             />
             <div className="flex items-center gap-2 mt-4">
-              <h2 className="text-xl font-display font-bold">{chat.name}</h2>
+              <h2 className="text-xl font-display font-bold">{chatData.name}</h2>
               {isOfficial && <CheckCircle2 className="w-5 h-5 text-primary" />}
             </div>
             <p className="text-primary text-sm mt-1">
               {isChannel 
-                ? `${chat.followers_count?.toLocaleString() || 0} pengikut`
+                ? `${chatData.followers_count?.toLocaleString() || 0} pengikut`
                 : `${participants.length} anggota`
               }
             </p>
-            {chat.description && (
+            {chatData.description && (
               <p className="text-muted-foreground text-center mt-3 max-w-sm">
-                {chat.description}
+                {chatData.description}
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Dibuat {new Date(chat.created_at).toLocaleDateString('id-ID', {
+              Dibuat {new Date(chatData.created_at).toLocaleDateString('id-ID', {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric'
@@ -302,39 +322,56 @@ export function GroupChannelInfo({
               <div className="flex-1 text-left">
                 <p className="font-medium">Link Undangan</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  {chat.invite_link || `zursapp.com/join/${chat.id.slice(0, 8)}...`}
+                  {chatData.invite_link || `zursapp.com/join/${chatData.id.slice(0, 8)}...`}
                 </p>
               </div>
               <Copy className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
 
-          {/* Settings (for admins only, hidden for channels to viewers) */}
-          {!isChannel && isUserAdmin && (
+          {/* Settings (for admins only) */}
+          {isUserAdmin && (
             <div className="p-4 border-b border-border space-y-2">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3">Pengaturan</h3>
               
+              {/* Edit Settings Button */}
               <button
-                onClick={toggleGroupClosed}
+                onClick={() => setShowSettings(true)}
                 className="w-full flex items-center gap-3 p-4 bg-card rounded-xl"
               >
-                {chat.is_closed ? (
-                  <Lock className="w-5 h-5 text-primary" />
-                ) : (
-                  <Unlock className="w-5 h-5 text-primary" />
-                )}
+                <Settings className="w-5 h-5 text-primary" />
                 <div className="flex-1 text-left">
-                  <p className="font-medium">
-                    {chat.is_closed ? 'Grup Tertutup' : 'Grup Terbuka'}
-                  </p>
+                  <p className="font-medium">Edit {isChannel ? 'Saluran' : 'Grup'}</p>
                   <p className="text-sm text-muted-foreground">
-                    {chat.is_closed 
-                      ? 'Hanya admin yang dapat mengirim pesan' 
-                      : 'Semua anggota dapat mengirim pesan'
-                    }
+                    Ubah nama, deskripsi, foto profil
                   </p>
                 </div>
               </button>
+
+              {/* Close/Open Group - only for groups */}
+              {!isChannel && (
+                <button
+                  onClick={toggleGroupClosed}
+                  className="w-full flex items-center gap-3 p-4 bg-card rounded-xl"
+                >
+                  {chatData.is_closed ? (
+                    <Lock className="w-5 h-5 text-primary" />
+                  ) : (
+                    <Unlock className="w-5 h-5 text-primary" />
+                  )}
+                  <div className="flex-1 text-left">
+                    <p className="font-medium">
+                      {chatData.is_closed ? 'Grup Tertutup' : 'Grup Terbuka'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {chatData.is_closed 
+                        ? 'Hanya admin yang dapat mengirim pesan' 
+                        : 'Semua anggota dapat mengirim pesan'
+                      }
+                    </p>
+                  </div>
+                </button>
+              )}
 
               <button
                 onClick={() => toast.info('Fitur tambah anggota akan segera hadir')}
@@ -342,6 +379,19 @@ export function GroupChannelInfo({
               >
                 <UserPlus className="w-5 h-5 text-primary" />
                 <span className="font-medium">Tambah Anggota</span>
+              </button>
+            </div>
+          )}
+
+          {/* Report Button - for non-admins */}
+          {!isUserAdmin && !isOfficial && (
+            <div className="p-4 border-b border-border">
+              <button
+                onClick={() => setShowReportModal(true)}
+                className="w-full flex items-center gap-3 p-4 bg-card rounded-xl text-destructive"
+              >
+                <Flag className="w-5 h-5" />
+                <span className="font-medium">Laporkan {isChannel ? 'Saluran' : 'Grup'}</span>
               </button>
             </div>
           )}
@@ -571,6 +621,30 @@ export function GroupChannelInfo({
               onChatWithUser(uid);
               onClose();
             }}
+          />
+
+          {/* Group Settings Modal */}
+          <GroupSettingsModal
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            chat={{
+              id: chatData.id,
+              name: chatData.name,
+              description: chatData.description,
+              avatar_url: chatData.avatar_url,
+              type: chatData.type,
+            }}
+            onUpdate={refreshChatData}
+          />
+
+          {/* Report Chat Modal */}
+          <ReportChatModal
+            isOpen={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            chatId={chatData.id}
+            chatName={chatData.name || ''}
+            chatType={chatData.type}
+            userId={userId}
           />
         </motion.div>
       )}

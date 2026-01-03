@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Search, Shield, Users, AlertTriangle, Ban, CheckCircle, XCircle, Eye, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Search, Shield, Users, AlertTriangle, Ban, CheckCircle, XCircle, Eye, MessageSquare, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/Avatar';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { ChatAdminPanel } from '@/components/ChatAdminPanel';
 
 interface AdminPanelProps {
   userId: string;
   onBack: () => void;
 }
 
-type Tab = 'users' | 'reports' | 'appeals';
+type Tab = 'users' | 'reports' | 'appeals' | 'chats';
 
 export function AdminPanel({ userId, onBack }: AdminPanelProps) {
   const { isAdmin } = useAuth();
@@ -102,7 +103,19 @@ export function AdminPanel({ userId, onBack }: AdminPanelProps) {
     { id: 'users' as Tab, label: 'Pengguna', icon: Users, count: users.length },
     { id: 'reports' as Tab, label: 'Laporan', icon: AlertTriangle, count: reports.filter(r => r.status === 'pending').length },
     { id: 'appeals' as Tab, label: 'Banding', icon: MessageSquare, count: appeals.length },
+    { id: 'chats' as Tab, label: 'Grup/Saluran', icon: Radio, count: 0 },
   ];
+
+  // If chats tab is selected, render the ChatAdminPanel
+  if (activeTab === 'chats') {
+    return (
+      <ChatAdminPanel
+        userId={userId}
+        isAdmin={isAdmin}
+        onBack={() => setActiveTab('users')}
+      />
+    );
+  }
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('id-ID', {

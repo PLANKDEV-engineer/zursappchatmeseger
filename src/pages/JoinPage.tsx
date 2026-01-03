@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, Radio, ArrowLeft, UserPlus, Check, Loader2 } from 'lucide-react';
+import { Users, Radio, ArrowLeft, UserPlus, Check, Loader2, XCircle, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
 import { useAuth } from '@/context/AuthContext';
@@ -17,12 +17,13 @@ interface ChatInfo {
   is_official: boolean;
   followers_count: number;
   memberCount: number;
+  isBlocked: boolean;
 }
 
 export default function JoinPage() {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, profile } = useAuth();
   
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,16 @@ export default function JoinPage() {
         return;
       }
 
+      // Check if chat is blocked
+      const { data: blockData } = await supabase
+        .from('chat_blocks')
+        .select('*')
+        .eq('chat_id', chat.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      const isBlocked = !!blockData;
+
       // Get member count
       const { count } = await supabase
         .from('chat_participants')
@@ -70,6 +81,7 @@ export default function JoinPage() {
         is_official: chat.is_official || false,
         followers_count: chat.followers_count || 0,
         memberCount: count || 0,
+        isBlocked,
       });
 
       // Check if user is already a member
@@ -92,7 +104,7 @@ export default function JoinPage() {
   };
 
   const handleJoin = async () => {
-    if (!user || !chatInfo) {
+    if (!user || !chatInfo || !profile) {
       toast.error('Silakan login terlebih dahulu');
       return;
     }
@@ -119,6 +131,18 @@ export default function JoinPage() {
           .eq('id', chatInfo.id);
       }
 
+      // Send system message for group join
+      if (chatInfo.type === 'group') {
+        await supabase
+          .from('messages')
+          .insert({
+            chat_id: chatInfo.id,
+            sender_id: user.id,
+            content: `${profile.name} telah bergabung ke grup menggunakan link tautan`,
+            type: 'text',
+          });
+      }
+
       toast.success(
         chatInfo.type === 'channel' 
           ? 'Berhasil mengikuti saluran!' 
@@ -132,6 +156,10 @@ export default function JoinPage() {
     } finally {
       setJoining(false);
     }
+  };
+
+  const handleCancel = () => {
+    navigate('/');
   };
 
   if (authLoading || loading) {
@@ -161,6 +189,48 @@ export default function JoinPage() {
   }
 
   if (!chatInfo) return null;
+
+  // Show blocked chat view
+  if (chatInfo.isBlocked) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-sm w-full text-center"
+        >
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <Avatar
+                src={chatInfo.avatar_url || undefined}
+                name={chatInfo.name}
+                size="xl"
+              />
+              <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-destructive flex items-center justify-center">
+                <Ban className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <h1 className="text-xl font-display font-bold text-foreground mb-2">
+            {chatInfo.name}
+          </h1>
+          
+          <div className="flex items-center justify-center gap-2 text-destructive mb-6">
+            <XCircle className="w-5 h-5" />
+            <span className="font-medium">
+              {chatInfo.type === 'channel' ? 'Saluran tidak tersedia lagi' : 'Grup sudah tidak tersedia'}
+            </span>
+          </div>
+
+          <Button onClick={() => navigate('/')} variant="outline" className="w-full">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Kembali ke Beranda
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
@@ -214,10 +284,10 @@ export default function JoinPage() {
         {!user ? (
           <div className="space-y-3">
             <p className="text-center text-muted-foreground text-sm mb-4">
-              Login untuk {chatInfo.type === 'channel' ? 'mengikuti' : 'bergabung'}
+              Login untuk {chatInfo.type === 'channel' ? 'mengikuti saluran' : 'bergabung ke grup'}
             </p>
             <Button onClick={() => navigate('/')} className="w-full">
-              Login
+              Login / Daftar
             </Button>
           </div>
         ) : alreadyMember ? (
@@ -233,29 +303,28 @@ export default function JoinPage() {
             </Button>
           </div>
         ) : (
-          <Button
-            onClick={handleJoin}
-            disabled={joining}
-            className="w-full"
-          >
-            {joining ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <UserPlus className="w-4 h-4 mr-2" />
-            )}
-            {chatInfo.type === 'channel' ? 'Ikuti Saluran' : 'Gabung Grup'}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={handleCancel}
+              variant="outline"
+              className="flex-1"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleJoin}
+              disabled={joining}
+              className="flex-1"
+            >
+              {joining ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <UserPlus className="w-4 h-4 mr-2" />
+              )}
+              {chatInfo.type === 'channel' ? 'Ikuti' : 'Gabung'}
+            </Button>
+          </div>
         )}
-
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/')}
-          className="w-full mt-3 text-muted-foreground"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Kembali
-        </Button>
       </motion.div>
     </div>
   );

@@ -43,7 +43,7 @@ function LoadingScreen() {
 function AppContent() {
   const { user, profile, loading, isAdmin, isBlocked, blockInfo } = useAuth();
   const { toast } = useToast();
-  const { chats, createPrivateChat, createGroupChat } = useChats(user?.id);
+  const { chats, fetchChats, createPrivateChat, createGroupChat } = useChats(user?.id);
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
   
@@ -236,6 +236,8 @@ function AppContent() {
             onAddGroup={() => setShowCreateGroup(true)}
             onAddChannel={() => setShowCreateChannel(true)}
             onSettings={() => handleNavigate(3)}
+            userId={user.id}
+            onRefresh={fetchChats}
           />
         );
       case 'status':
