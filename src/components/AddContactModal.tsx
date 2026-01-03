@@ -80,11 +80,13 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
     await addContact(user.name, user.phone, user.public_id);
     // Then open chat
     onCreateChat(user.user_id);
+    onClose();
   };
 
   const handleSelectContact = (contact: any) => {
     if (contact.contact_user_id) {
       onCreateChat(contact.contact_user_id);
+      onClose();
     }
   };
 
@@ -240,11 +242,16 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                 <div className="mb-4">
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">Hasil Pencarian</h3>
                   <div className="space-y-1">
-                    {searchResults.map(user => (
-                      <button
+                    {searchResults.map((user) => (
+                      <div
                         key={user.user_id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleSelectUser(user)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card-hover transition-all"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') handleSelectUser(user);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card-hover transition-all cursor-pointer"
                       >
                         <button
                           type="button"
@@ -262,40 +269,35 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                           className="rounded-full"
                           aria-label={`Lihat info akun ${user.name}`}
                         >
-                          <Avatar
-                            src={user.avatar_url}
-                            name={user.name}
-                            size="md"
-                          />
+                          <Avatar src={user.avatar_url} name={user.name} size="md" />
                         </button>
+
                         <div className="text-left flex-1 min-w-0">
                           <h4 className="font-medium text-foreground">{user.name}</h4>
                           <p className="text-sm text-muted-foreground truncate">{user.phone || 'No phone'}</p>
                           <p className="text-xs text-primary/70 font-mono truncate">ID: {user.public_id?.slice(0, 8)}...</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setInfoUser({
-                                user_id: user.user_id,
-                                name: user.name,
-                                phone: user.phone,
-                                avatar_url: user.avatar_url,
-                                public_id: user.public_id,
-                              });
-                              setShowUserInfo(true);
-                            }}
-                            aria-label={`Info akun ${user.name}`}
-                          >
-                            <Info className="w-4 h-4" />
-                          </Button>
-                          <MessageCircle className="w-5 h-5 text-primary" />
-                        </div>
-                      </button>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInfoUser({
+                              user_id: user.user_id,
+                              name: user.name,
+                              phone: user.phone,
+                              avatar_url: user.avatar_url,
+                              public_id: user.public_id,
+                            });
+                            setShowUserInfo(true);
+                          }}
+                          aria-label={`Info akun ${user.name}`}
+                        >
+                          <Info className="w-4 h-4" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -312,11 +314,16 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">Kontak Tersimpan</h3>
                   <div className="space-y-1">
-                    {contacts.map(contact => (
-                      <button
+                    {contacts.map((contact) => (
+                      <div
                         key={contact.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleSelectContact(contact)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card-hover transition-all"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') handleSelectContact(contact);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-card-hover transition-all cursor-pointer"
                       >
                         <button
                           type="button"
@@ -343,6 +350,7 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                             showStatus={!!contact.contact_user_id}
                           />
                         </button>
+
                         <div className="text-left flex-1 min-w-0">
                           <h4 className="font-medium text-foreground">{contact.name}</h4>
                           <p className="text-sm text-muted-foreground truncate">{contact.phone || 'No phone'}</p>
@@ -352,6 +360,7 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                             </p>
                           )}
                         </div>
+
                         <Button
                           type="button"
                           variant="ghost"
@@ -372,7 +381,7 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                         >
                           <Info className="w-4 h-4" />
                         </Button>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -385,9 +394,19 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                 </div>
               )}
             </div>
+            </motion.div>
+
+            <UserInfoSheet
+              isOpen={showUserInfo}
+              onClose={() => setShowUserInfo(false)}
+              user={infoUser}
+              onChat={(targetUserId) => {
+                onCreateChat(targetUserId);
+                onClose();
+              }}
+            />
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+        )}
+      </AnimatePresence>
+    );
 }
