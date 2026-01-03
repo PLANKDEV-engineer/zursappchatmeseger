@@ -15,6 +15,8 @@ import {
   X,
   Check,
   CheckCheck,
+  FileText,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
@@ -258,6 +260,38 @@ export function ChatRoom({
     return true;
   })();
 
+  // Helper to parse URLs in text
+  const parseTextWithLinks = (text: string | null) => {
+    if (!text) return null;
+    
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return parts.map((part, i) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   const renderMessageContent = (message: any) => {
     // Handle poll type
     if (message.type === 'poll' && message.content) {
@@ -290,10 +324,17 @@ export function ChatRoom({
         <div className="max-w-[250px]">
           <img 
             src={message.media_url} 
-            alt="Shared image" 
-            className="rounded-lg w-full"
+            alt="Foto" 
+            className="rounded-lg w-full cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(message.media_url, '_blank');
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
           />
-          {message.content && <p className="text-sm mt-2">{message.content}</p>}
+          {message.content && <p className="text-sm mt-2">{parseTextWithLinks(message.content)}</p>}
         </div>
       );
     }
@@ -306,14 +347,57 @@ export function ChatRoom({
             src={message.media_url} 
             controls
             className="rounded-lg w-full"
+            onError={(e) => {
+              (e.target as HTMLVideoElement).style.display = 'none';
+            }}
           />
-          {message.content && <p className="text-sm mt-2">{message.content}</p>}
+          {message.content && <p className="text-sm mt-2">{parseTextWithLinks(message.content)}</p>}
         </div>
       );
     }
+
+    // Handle voice type
+    if (message.type === 'voice' && message.media_url) {
+      return (
+        <div className="flex items-center gap-3 min-w-[200px]">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+            <Mic className="w-5 h-5 text-primary" />
+          </div>
+          <audio 
+            src={message.media_url} 
+            controls
+            className="flex-1 h-8"
+          />
+        </div>
+      );
+    }
+
+    // Handle file type
+    if (message.type === 'file' && message.media_url) {
+      const fileName = message.content || 'File';
+      return (
+        <a 
+          href={message.media_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          download
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors min-w-[200px]"
+        >
+          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+            <FileText className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{fileName}</p>
+            <p className="text-xs text-muted-foreground">Ketuk untuk unduh</p>
+          </div>
+          <Download className="w-4 h-4 text-muted-foreground" />
+        </a>
+      );
+    }
     
-    // Default text
-    return <p className="text-sm">{message.content}</p>;
+    // Default text with link parsing
+    return <p className="text-sm whitespace-pre-wrap">{parseTextWithLinks(message.content)}</p>;
   };
 
   return (
