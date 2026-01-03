@@ -64,6 +64,7 @@ export function ChatRoom({
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
   const [showReactions, setShowReactions] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName?: string } | null>(null);
   const [showProfileView, setShowProfileView] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -609,9 +610,55 @@ export function ChatRoom({
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 className="w-full h-11 px-4 pr-12 rounded-full bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2">
+              <button 
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              >
                 <Smile className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
               </button>
+
+              {/* Emoji Picker */}
+              <AnimatePresence>
+                {showEmojiPicker && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute bottom-full right-0 mb-2 bg-card rounded-2xl border border-border shadow-xl p-3 w-72"
+                  >
+                    <div className="grid grid-cols-8 gap-1">
+                      {['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤗', '🤭', '🤫', '🤔', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮', '😯', '😲', '😳', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼'].map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => {
+                            setInputValue(prev => prev + emoji);
+                            setShowEmojiPicker(false);
+                          }}
+                          className="w-8 h-8 text-xl hover:bg-muted rounded-lg transition-colors flex items-center justify-center"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="border-t border-border mt-2 pt-2">
+                      <div className="grid grid-cols-8 gap-1">
+                        {['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💯', '✨', '🔥', '⭐', '🎉', '🎊', '👍', '👎', '👏', '🙌', '🤝', '✌️', '🤞', '🤟', '👌', '🤌'].map((emoji) => (
+                          <button
+                            key={emoji}
+                            onClick={() => {
+                              setInputValue(prev => prev + emoji);
+                              setShowEmojiPicker(false);
+                            }}
+                            className="w-8 h-8 text-xl hover:bg-muted rounded-lg transition-colors flex items-center justify-center"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {inputValue.trim() ? (

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Eye, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
 import { useAuth } from '@/context/AuthContext';
 import { useStatuses } from '@/hooks/useStatuses';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StatusViewerProps {
   isOpen: boolean;
@@ -13,11 +14,21 @@ interface StatusViewerProps {
   onView: (statusId: string) => void;
 }
 
+interface Viewer {
+  viewer_id: string;
+  viewed_at: string;
+  name: string;
+  avatar_url: string | null;
+}
+
 export function StatusViewer({ isOpen, onClose, statuses, onView }: StatusViewerProps) {
   const { user, profile } = useAuth();
   const { deleteStatus } = useStatuses(user?.id);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [showViewers, setShowViewers] = useState(false);
+  const [viewers, setViewers] = useState<Viewer[]>([]);
+  const [loadingViewers, setLoadingViewers] = useState(false);
 
   const currentStatus = statuses[currentIndex];
   const isMyStatus = currentStatus?.user_id === user?.id;
@@ -40,7 +51,7 @@ export function StatusViewer({ isOpen, onClose, statuses, onView }: StatusViewer
 
   // Auto-advance timer
   useEffect(() => {
-    if (!isOpen || !currentStatus) return;
+    if (!isOpen || !currentStatus || showViewers) return;
 
     const duration = currentStatus.type === 'video' ? 30000 : 5000;
     const interval = 50;
@@ -60,15 +71,60 @@ export function StatusViewer({ isOpen, onClose, statuses, onView }: StatusViewer
     onView(currentStatus.id);
 
     return () => clearInterval(timer);
-  }, [isOpen, currentStatus, currentIndex, goToNext, onView]);
+  }, [isOpen, currentStatus, currentIndex, goToNext, onView, showViewers]);
 
   // Reset on open
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
       setProgress(0);
+      setShowViewers(false);
     }
   }, [isOpen]);
+
+  // Fetch viewers when showing viewers panel
+  const fetchViewers = async () => {
+    if (!currentStatus) return;
+    setLoadingViewers(true);
+    try {
+      const { data, error } = await supabase
+        .from('status_viewers')
+        .select('viewer_id, viewed_at')
+        .eq('status_id', currentStatus.id)
+        .order('viewed_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch profiles for viewers
+      const viewersWithProfiles: Viewer[] = [];
+      for (const v of data || []) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, avatar_url')
+          .eq('user_id', v.viewer_id)
+          .single();
+
+        viewersWithProfiles.push({
+          viewer_id: v.viewer_id,
+          viewed_at: v.viewed_at,
+          name: profile?.name || 'Unknown',
+          avatar_url: profile?.avatar_url,
+        });
+      }
+
+      setViewers(viewersWithProfiles);
+    } catch (err) {
+      console.error('Error fetching viewers:', err);
+    } finally {
+      setLoadingViewers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showViewers && isMyStatus) {
+      fetchViewers();
+    }
+  }, [showViewers, currentStatus?.id]);
 
   const handleDelete = async () => {
     if (!currentStatus) return;
@@ -86,6 +142,28 @@ export function StatusViewer({ isOpen, onClose, statuses, onView }: StatusViewer
     if (hours > 0) return `${hours}j lalu`;
     if (minutes > 0) return `${minutes}m lalu`;
     return 'Baru saja';
+  };
+
+  const formatDetailedTime = (date: string) => {
+    const d = new Date(date);
+    return d.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  // Swipe handler for viewers panel
+  const handleSwipeUp = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (isMyStatus && info.offset.y < -50) {
+      setShowViewers(true);
+    }
+  };
+
+  const handleSwipeDown = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (info.offset.y > 50) {
+      setShowViewers(false);
+    }
   };
 
   if (!currentStatus) return null;
@@ -153,7 +231,13 @@ export function StatusViewer({ isOpen, onClose, statuses, onView }: StatusViewer
           </header>
 
           {/* Content */}
-          <div className="flex-1 flex items-center justify-center relative">
+          <motion.div 
+            className="flex-1 flex items-center justify-center relative"
+            drag={isMyStatus ? "y" : false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={0.2}
+            onDragEnd={handleSwipeUp}
+          >
             {/* Navigation Areas */}
             <button
               onClick={goToPrev}
@@ -191,7 +275,7 @@ export function StatusViewer({ isOpen, onClose, statuses, onView }: StatusViewer
                 onEnded={goToNext}
               />
             )}
-          </div>
+          </motion.div>
 
           {/* Caption (for media) */}
           {currentStatus.caption && currentStatus.type !== 'text' && (
@@ -200,15 +284,93 @@ export function StatusViewer({ isOpen, onClose, statuses, onView }: StatusViewer
             </div>
           )}
 
-          {/* Viewers (for own status) */}
-          {isMyStatus && (
-            <div className="p-4 bg-gradient-to-t from-black/80 to-transparent">
+          {/* Viewers hint (for own status) */}
+          {isMyStatus && !showViewers && (
+            <div 
+              className="p-4 bg-gradient-to-t from-black/80 to-transparent cursor-pointer"
+              onClick={() => setShowViewers(true)}
+            >
               <div className="flex items-center justify-center gap-2 text-white/60">
                 <Eye className="w-4 h-4" />
                 <span className="text-sm">{currentStatus.viewCount || 0} dilihat</span>
               </div>
+              <p className="text-xs text-white/40 text-center mt-1">
+                Geser ke atas untuk melihat penonton
+              </p>
             </div>
           )}
+
+          {/* Viewers Panel (swipe up) */}
+          <AnimatePresence>
+            {showViewers && isMyStatus && (
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25 }}
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={0.2}
+                onDragEnd={handleSwipeDown}
+                className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[60vh] overflow-hidden"
+              >
+                <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mt-3" />
+                
+                <div className="p-4 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-primary" />
+                    <h3 className="font-display font-bold text-lg">
+                      Dilihat oleh ({viewers.length})
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto max-h-[calc(60vh-80px)]">
+                  {loadingViewers ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    </div>
+                  ) : viewers.length > 0 ? (
+                    <div className="divide-y divide-border/30">
+                      {viewers.map((viewer) => (
+                        <div
+                          key={viewer.viewer_id}
+                          className="flex items-center gap-3 p-4"
+                        >
+                          <Avatar
+                            src={viewer.avatar_url || undefined}
+                            name={viewer.name}
+                            size="sm"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">{viewer.name}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDetailedTime(viewer.viewed_at)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Eye className="w-10 h-10 mb-2 opacity-50" />
+                      <p>Belum ada yang melihat</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowViewers(false)}
+                    className="w-full"
+                  >
+                    Tutup
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>
