@@ -16,6 +16,7 @@ import {
   MessageCircle,
   MoreVertical,
 } from 'lucide-react';
+import { UserInfoSheet, UserInfoSheetUser } from '@/components/UserInfoSheet';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,6 +59,10 @@ export function GroupChannelInfo({
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [showMemberMenu, setShowMemberMenu] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // For viewing user info sheet
+  const [showUserInfo, setShowUserInfo] = useState(false);
+  const [userInfoData, setUserInfoData] = useState<UserInfoSheetUser | null>(null);
 
   const isChannel = chat.type === 'channel';
   const isOfficial = chat.is_official;
@@ -359,12 +364,31 @@ export function GroupChannelInfo({
                       key={participant.id}
                       className="flex items-center gap-3 p-3 bg-card rounded-xl"
                     >
-                      <Avatar
-                        src={participant.profile?.avatar_url || undefined}
-                        name={participant.profile?.name}
-                        size="sm"
-                        showStatus={participant.profile?.is_online}
-                      />
+                      {/* Avatar - click opens UserInfoSheet */}
+                      <button
+                        type="button"
+                        className="focus:outline-none"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (participant.user_id !== userId) {
+                            setUserInfoData({
+                              user_id: participant.user_id,
+                              name: participant.profile?.name || 'Unknown',
+                              phone: participant.profile?.phone,
+                              avatar_url: participant.profile?.avatar_url,
+                              public_id: participant.profile?.public_id,
+                            });
+                            setShowUserInfo(true);
+                          }
+                        }}
+                      >
+                        <Avatar
+                          src={participant.profile?.avatar_url || undefined}
+                          name={participant.profile?.name}
+                          size="sm"
+                          showStatus={participant.profile?.is_online}
+                        />
+                      </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium truncate">
@@ -395,7 +419,8 @@ export function GroupChannelInfo({
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             onChatWithUser(participant.user_id);
                             onClose();
                           }}
@@ -410,7 +435,8 @@ export function GroupChannelInfo({
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedParticipant(participant);
                             setShowMemberMenu(true);
                           }}
@@ -534,6 +560,18 @@ export function GroupChannelInfo({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* User Info Sheet - Displayed when avatar is clicked */}
+          <UserInfoSheet
+            isOpen={showUserInfo}
+            onClose={() => setShowUserInfo(false)}
+            user={userInfoData}
+            onChat={(uid) => {
+              setShowUserInfo(false);
+              onChatWithUser(uid);
+              onClose();
+            }}
+          />
         </motion.div>
       )}
     </AnimatePresence>
