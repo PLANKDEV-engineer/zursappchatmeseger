@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   User,
@@ -11,6 +11,8 @@ import {
   LogOut,
   Moon,
   Shield,
+  Archive,
+  Star,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/ui/button';
@@ -21,56 +23,102 @@ import { SecurityPage } from '@/components/settings/SecurityPage';
 import { AppearancePage } from '@/components/settings/AppearancePage';
 import { HelpPage } from '@/components/settings/HelpPage';
 import { AboutPage } from '@/components/settings/AboutPage';
+import { ArchivedChatsPage } from '@/components/ArchivedChatsPage';
+import { StarredMessagesPage } from '@/components/StarredMessagesPage';
 
 interface SettingsPageProps {
   onEditProfile: () => void;
 }
 
-type SettingsView = 'main' | 'notifications' | 'privacy' | 'security' | 'appearance' | 'help' | 'about';
+type SettingsView = 'main' | 'notifications' | 'privacy' | 'security' | 'appearance' | 'help' | 'about' | 'archived' | 'starred';
 
 const settingsItems = [
   {
+    icon: Archive,
+    label: 'Chat Diarsipkan',
+    description: 'Lihat chat yang telah diarsipkan',
+    view: 'archived' as SettingsView,
+  },
+  {
+    icon: Star,
+    label: 'Pesan Berbintang',
+    description: 'Lihat pesan yang ditandai bintang',
+    view: 'starred' as SettingsView,
+  },
+  {
     icon: Bell,
-    label: 'Notifications',
-    description: 'Message, group & call tones',
+    label: 'Notifikasi',
+    description: 'Nada pesan, grup & panggilan',
     view: 'notifications' as SettingsView,
   },
   {
     icon: Lock,
-    label: 'Privacy',
-    description: 'Block contacts, disappearing messages',
+    label: 'Privasi',
+    description: 'Blokir kontak, pesan sementara',
     view: 'privacy' as SettingsView,
   },
   {
     icon: Shield,
-    label: 'Security',
-    description: 'End-to-end encryption, app lock',
+    label: 'Keamanan',
+    description: 'Enkripsi, kunci aplikasi',
     view: 'security' as SettingsView,
   },
   {
     icon: Palette,
-    label: 'Appearance',
-    description: 'Theme, wallpaper, chat display',
+    label: 'Tampilan',
+    description: 'Tema, wallpaper, tampilan chat',
     view: 'appearance' as SettingsView,
   },
   {
     icon: HelpCircle,
-    label: 'Help',
-    description: 'Help center, contact us, privacy policy',
+    label: 'Bantuan',
+    description: 'Pusat bantuan, hubungi kami',
     view: 'help' as SettingsView,
   },
   {
     icon: Info,
-    label: 'About',
-    description: 'App version, licenses',
+    label: 'Tentang',
+    description: 'Versi aplikasi, lisensi',
     view: 'about' as SettingsView,
   },
 ];
 
 export function SettingsPage({ onEditProfile }: SettingsPageProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, user } = useAuth();
   const [currentView, setCurrentView] = useState<SettingsView>('main');
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('app_theme');
+    return saved !== 'light';
+  });
+
+  useEffect(() => {
+    // Apply saved theme on mount
+    const savedTheme = localStorage.getItem('app_theme');
+    if (savedTheme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+      setIsDarkMode(false);
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      setIsDarkMode(true);
+    }
+  }, []);
+
+  const handleToggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      localStorage.setItem('app_theme', 'dark');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('app_theme', 'light');
+    }
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -96,6 +144,12 @@ export function SettingsPage({ onEditProfile }: SettingsPageProps) {
   }
   if (currentView === 'about') {
     return <AboutPage onBack={handleBack} />;
+  }
+  if (currentView === 'archived') {
+    return <ArchivedChatsPage userId={user?.id || ''} onBack={handleBack} onChatSelect={() => {}} />;
+  }
+  if (currentView === 'starred') {
+    return <StarredMessagesPage userId={user?.id || ''} onBack={handleBack} />;
   }
 
   return (
@@ -171,13 +225,13 @@ export function SettingsPage({ onEditProfile }: SettingsPageProps) {
               <Moon className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1 text-left">
-              <h3 className="font-medium text-foreground">Dark Mode</h3>
+              <h3 className="font-medium text-foreground">Mode Gelap</h3>
               <p className="text-sm text-muted-foreground">
-                Toggle dark theme
+                Aktifkan tema gelap
               </p>
             </div>
             <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
+              onClick={handleToggleDarkMode}
               className={`w-12 h-7 rounded-full transition-colors ${
                 isDarkMode ? 'bg-primary' : 'bg-muted'
               }`}

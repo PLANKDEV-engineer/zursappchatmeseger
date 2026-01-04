@@ -18,6 +18,7 @@ import { EditProfileModal } from '@/components/EditProfileModal';
 import { CallScreen } from '@/components/CallScreen';
 import { BottomNav } from '@/components/BottomNav';
 import { BlockedScreen } from '@/components/BlockedScreen';
+import { CameraPage } from '@/components/CameraPage';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -62,6 +63,7 @@ function AppContent() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showStatusViewer, setShowStatusViewer] = useState(false);
   const [showCallScreen, setShowCallScreen] = useState(false);
+  const [showCameraPage, setShowCameraPage] = useState(false);
   const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
   const [[page, direction], setPage] = useState([0, 0]);
 
@@ -116,7 +118,12 @@ function AppContent() {
     
     if (Math.abs(info.offset.x) > threshold || Math.abs(info.velocity.x) > velocity) {
       if (info.offset.x > 0) {
-        // Swipe right - go to previous page
+        // Swipe right - check if on chat page to open camera
+        if (activeNavIndex === 0 && currentView === 'chats') {
+          setShowCameraPage(true);
+          return;
+        }
+        // Otherwise go to previous page
         handleNavigate(activeNavIndex - 1);
       } else {
         // Swipe left - go to next page
@@ -355,6 +362,21 @@ function AppContent() {
           onEndCall={handleEndCall}
         />
       )}
+
+      {/* Camera Page */}
+      <AnimatePresence>
+        {showCameraPage && (
+          <CameraPage
+            isOpen={showCameraPage}
+            onClose={() => setShowCameraPage(false)}
+            userId={user.id}
+            onPostStatus={async (mediaUrl, type) => {
+              await createStatus(type, '', { mediaUrl });
+              setShowCameraPage(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

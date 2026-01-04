@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Moon, Sun, Palette, Image } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Palette, Image, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { WallpaperSettingsPage } from './WallpaperSettingsPage';
 
 interface AppearancePageProps {
   onBack: () => void;
@@ -16,23 +17,14 @@ const themes = [
   { id: 'neon', name: 'Neon', icon: Palette, color: 'from-pink-500 to-purple-600' },
 ];
 
-const wallpapers = [
-  { id: 'default', name: 'Default', color: 'bg-background' },
-  { id: 'gradient1', name: 'Gradient 1', color: 'bg-gradient-to-br from-primary/20 to-accent/20' },
-  { id: 'gradient2', name: 'Gradient 2', color: 'bg-gradient-to-br from-purple-500/20 to-pink-500/20' },
-  { id: 'pattern', name: 'Pattern', color: 'tech-grid bg-background' },
-];
-
 export function AppearancePage({ onBack }: AppearancePageProps) {
   const [selectedTheme, setSelectedTheme] = useState(() => {
     return localStorage.getItem('app_theme') || 'dark';
   });
-  const [selectedWallpaper, setSelectedWallpaper] = useState(() => {
-    return localStorage.getItem('chat_wallpaper') || 'default';
-  });
   const [largeFont, setLargeFont] = useState(() => {
     return localStorage.getItem('large_font') === 'true';
   });
+  const [showWallpaperSettings, setShowWallpaperSettings] = useState(false);
 
   const handleThemeChange = (themeId: string) => {
     setSelectedTheme(themeId);
@@ -40,18 +32,14 @@ export function AppearancePage({ onBack }: AppearancePageProps) {
     
     // Apply theme
     if (themeId === 'light') {
+      document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
     } else {
       document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
     }
     
     toast.success(`Tema ${themes.find(t => t.id === themeId)?.name} diterapkan`);
-  };
-
-  const handleWallpaperChange = (wpId: string) => {
-    setSelectedWallpaper(wpId);
-    localStorage.setItem('chat_wallpaper', wpId);
-    toast.success('Wallpaper chat diterapkan');
   };
 
   const handleFontToggle = (value: boolean) => {
@@ -71,7 +59,11 @@ export function AppearancePage({ onBack }: AppearancePageProps) {
   useEffect(() => {
     const savedTheme = localStorage.getItem('app_theme');
     if (savedTheme === 'light') {
+      document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
     }
     
     const savedFont = localStorage.getItem('large_font') === 'true';
@@ -79,6 +71,10 @@ export function AppearancePage({ onBack }: AppearancePageProps) {
       document.documentElement.classList.add('large-font');
     }
   }, []);
+
+  if (showWallpaperSettings) {
+    return <WallpaperSettingsPage onBack={() => setShowWallpaperSettings(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -115,28 +111,24 @@ export function AppearancePage({ onBack }: AppearancePageProps) {
           </div>
         </div>
 
-        {/* Wallpapers */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground px-2 flex items-center gap-2">
-            <Image className="w-4 h-4" />
-            Wallpaper Chat
-          </h2>
-          <div className="grid grid-cols-4 gap-2">
-            {wallpapers.map((wp) => (
-              <motion.button
-                key={wp.id}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handleWallpaperChange(wp.id)}
-                className={`aspect-square rounded-xl border-2 transition-all ${wp.color} ${
-                  selectedWallpaper === wp.id
-                    ? 'border-primary'
-                    : 'border-border'
-                }`}
-              />
-            ))}
+        {/* Wallpaper Settings */}
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={() => setShowWallpaperSettings(true)}
+          className="w-full flex items-center gap-4 p-4 rounded-xl bg-card border border-border/50 hover:bg-card-hover transition-all"
+        >
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <Image className="w-5 h-5 text-primary" />
           </div>
-        </div>
+          <div className="flex-1 text-left">
+            <h3 className="font-medium text-foreground">Wallpaper Chat</h3>
+            <p className="text-sm text-muted-foreground">Atur gambar latar belakang chat</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </motion.button>
 
         {/* Font Size */}
         <motion.div
