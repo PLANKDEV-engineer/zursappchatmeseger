@@ -17,6 +17,7 @@ interface ChatDashboardProps {
   onAddGroup: () => void;
   onAddChannel: () => void;
   onSettings: () => void;
+  onOpenArchived: () => void;
   userId?: string;
   onRefresh?: () => void;
 }
@@ -28,6 +29,7 @@ export function ChatDashboard({
   onAddGroup,
   onAddChannel,
   onSettings,
+  onOpenArchived,
   userId,
   onRefresh,
 }: ChatDashboardProps) {
@@ -158,6 +160,27 @@ export function ChatDashboard({
 
       {/* Chat List */}
       <main className="flex-1 overflow-y-auto pb-32">
+        {!isSelectMode && (
+          <div className="px-4 pt-4">
+            <button
+              type="button"
+              onClick={onOpenArchived}
+              className="w-full flex items-center justify-between gap-3 p-4 rounded-xl bg-card border border-border/50 hover:bg-card-hover transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Archive className="w-5 h-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-foreground">Chat Diarsipkan</p>
+                  <p className="text-sm text-muted-foreground">Lihat semua chat yang disembunyikan</p>
+                </div>
+              </div>
+              <span className="text-sm text-muted-foreground">›</span>
+            </button>
+          </div>
+        )}
+
         {filteredChats.length > 0 ? (
           <div className="divide-y divide-border/30">
             {filteredChats.map((chat, index) => (
