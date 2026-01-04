@@ -129,7 +129,9 @@ export function GroupChannelInfo({
   };
 
   const copyInviteLink = async () => {
-    const link = chat.invite_link || `https://zursapp.com/join/${chat.id}`;
+    // Use current origin for the invite link so it works in any environment
+    const origin = window.location.origin;
+    const link = chat.invite_link || `${origin}/join/${chat.id}`;
     await navigator.clipboard.writeText(link);
     setLinkCopied(true);
     toast.success('Link berhasil disalin!');
@@ -322,7 +324,7 @@ export function GroupChannelInfo({
               <div className="flex-1 text-left">
                 <p className="font-medium">Link Undangan</p>
                 <p className="text-sm text-muted-foreground truncate">
-                  {chatData.invite_link || `zursapp.com/join/${chatData.id.slice(0, 8)}...`}
+                  {chatData.invite_link || `${window.location.host}/join/${chatData.id.slice(0, 8)}...`}
                 </p>
               </div>
               <Copy className="w-5 h-5 text-muted-foreground" />

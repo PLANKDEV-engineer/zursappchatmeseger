@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MoreVertical, MessageSquarePlus, Check, Trash2, X, CheckCheck } from 'lucide-react';
+import { Search, MoreVertical, MessageSquarePlus, Check, Trash2, X, CheckCheck, Archive } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -278,9 +278,33 @@ export function ChatDashboard({
                 </button>
 
                 <button
+                  onClick={async () => {
+                    if (selectedChats.size === 0 || !userId) return;
+                    try {
+                      for (const chatId of selectedChats) {
+                        await supabase
+                          .from('chat_participants')
+                          .update({ is_archived: true })
+                          .eq('chat_id', chatId)
+                          .eq('user_id', userId);
+                      }
+                      toast.success(`${selectedChats.size} chat diarsipkan`);
+                      setShowDeleteConfirm(false);
+                      handleCancelSelect();
+                      onRefresh?.();
+                    } catch (error) {
+                      toast.error('Gagal mengarsipkan chat');
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-muted transition-colors"
+                >
+                  <Archive className="w-5 h-5 text-primary" />
+                  <span className="font-medium">Arsipkan ({selectedChats.size})</span>
+                </button>
+
+                <button
                   onClick={() => {
                     setShowDeleteConfirm(false);
-                    // Show final confirmation dialog
                     if (confirm(`Yakin ingin menghapus ${selectedChats.size} chat? Riwayat pesan akan dihapus untuk Anda.`)) {
                       handleDeleteSelected();
                     }

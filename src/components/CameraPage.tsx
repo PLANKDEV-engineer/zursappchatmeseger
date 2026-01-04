@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { 
   X, Camera, SwitchCamera, Zap, ZapOff, 
-  Image as ImageIcon, Send, Check, Trash2 
+  Image as ImageIcon, Send, Check, Trash2,
+  MapPin, Mic, FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +15,12 @@ interface CameraPageProps {
   userId: string;
   onSendToChat?: (mediaUrl: string, type: 'image' | 'video') => void;
   onPostStatus?: (mediaUrl: string, type: 'image' | 'video') => void;
+}
+
+interface GalleryItem {
+  url: string;
+  type: 'image' | 'video';
+  file?: File;
 }
 
 export function CameraPage({ 
@@ -30,23 +37,46 @@ export function CameraPage({
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   const [isRecording, setIsRecording] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
-  const [galleryItems, setGalleryItems] = useState<{ url: string; type: 'image' | 'video' }[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<GalleryItem[]>([]);
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [showActions, setShowActions] = useState(false);
+  const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      startCamera();
+      requestPermissions();
     } else {
       stopCamera();
     }
     return () => stopCamera();
   }, [isOpen, facingMode]);
+
+  const requestPermissions = async () => {
+    try {
+      // Request camera and microphone permissions
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
+        audio: true,
+      });
+      
+      setStream(mediaStream);
+      setHasPermissions(true);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setHasPermissions(false);
+      toast.error('Izinkan akses kamera dan mikrofon untuk menggunakan fitur ini');
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -130,7 +160,6 @@ export function CameraPage({
     if (!capturedMedia) return;
 
     try {
-      // Convert data URL to blob
       const response = await fetch(capturedMedia);
       const blob = await response.blob();
       
@@ -184,17 +213,72 @@ export function CameraPage({
     }
   };
 
-  const toggleMediaSelection = (url: string) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newItems: GalleryItem[] = [];
+    
+    Array.from(files).forEach(file => {
+      if (selectedMedia.length + newItems.length >= 5) {
+        toast.error('Maksimal 5 media');
+        return;
+      }
+      
+      const url = URL.createObjectURL(file);
+      const type = file.type.startsWith('video/') ? 'video' : 'image';
+      newItems.push({ url, type, file });
+    });
+
+    setSelectedMedia(prev => [...prev, ...newItems].slice(0, 5));
+    setGalleryItems(prev => [...newItems, ...prev]);
+  };
+
+  const toggleMediaSelection = (item: GalleryItem) => {
     setSelectedMedia(prev => {
-      if (prev.includes(url)) {
-        return prev.filter(u => u !== url);
+      const exists = prev.find(m => m.url === item.url);
+      if (exists) {
+        return prev.filter(m => m.url !== item.url);
       }
       if (prev.length >= 5) {
         toast.error('Maksimal 5 media');
         return prev;
       }
-      return [...prev, url];
+      return [...prev, item];
     });
+  };
+
+  const handleUploadSelected = async () => {
+    if (selectedMedia.length === 0) return;
+
+    try {
+      for (const media of selectedMedia) {
+        if (media.file) {
+          const fileName = `${userId}/${Date.now()}_${media.file.name}`;
+          const { data, error } = await supabase.storage
+            .from('media')
+            .upload(fileName, media.file);
+
+          if (error) throw error;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('media')
+            .getPublicUrl(data.path);
+
+          if (onPostStatus) {
+            onPostStatus(publicUrl, media.type);
+          }
+        }
+      }
+      
+      toast.success(`${selectedMedia.length} media berhasil diupload`);
+      setSelectedMedia([]);
+      setShowGallery(false);
+      onClose();
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      toast.error('Gagal mengupload media');
+    }
   };
 
   if (!isOpen) return null;
@@ -207,8 +291,27 @@ export function CameraPage({
       transition={{ type: 'spring', damping: 25 }}
       className="fixed inset-0 z-50 bg-black"
     >
+      {/* Permission request screen */}
+      {hasPermissions === false && (
+        <div className="flex flex-col items-center justify-center h-full p-6 text-center text-white">
+          <Camera className="w-16 h-16 mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-bold mb-2">Izin Diperlukan</h2>
+          <p className="text-muted-foreground mb-6">
+            Izinkan akses kamera dan mikrofon untuk menggunakan fitur ini
+          </p>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onClose}>
+              Batal
+            </Button>
+            <Button onClick={requestPermissions}>
+              Coba Lagi
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Camera View */}
-      {!capturedMedia && (
+      {hasPermissions && !capturedMedia && (
         <>
           <video
             ref={videoRef}
@@ -343,23 +446,63 @@ export function CameraPage({
               </Button>
               <h2 className="font-display font-bold">Galeri ({selectedMedia.length}/5)</h2>
               {selectedMedia.length > 0 && (
-                <Button size="sm" onClick={() => {
-                  // Handle selected media
-                  toast.success(`${selectedMedia.length} media dipilih`);
-                  setShowGallery(false);
-                }}>
+                <Button size="sm" onClick={handleUploadSelected}>
                   <Check className="w-4 h-4 mr-1" />
-                  Pilih
+                  Upload
                 </Button>
               )}
             </div>
             
-            <div className="p-2 grid grid-cols-3 gap-1 overflow-y-auto max-h-[calc(100vh-80px)]">
-              {/* Placeholder for gallery items */}
-              <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                <p className="text-xs text-muted-foreground text-center p-2">
-                  Galeri perangkat akan muncul di sini
-                </p>
+            <div className="p-4">
+              {/* Upload button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              
+              <Button 
+                variant="outline" 
+                className="w-full mb-4"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="w-5 h-5 mr-2" />
+                Pilih dari Galeri
+              </Button>
+
+              <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-[calc(100vh-200px)]">
+                {galleryItems.map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={() => toggleMediaSelection(item)}
+                    className={`relative aspect-square rounded-lg overflow-hidden ${
+                      selectedMedia.find(m => m.url === item.url) 
+                        ? 'ring-2 ring-primary' 
+                        : ''
+                    }`}
+                  >
+                    {item.type === 'image' ? (
+                      <img src={item.url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={item.url} className="w-full h-full object-cover" />
+                    )}
+                    {selectedMedia.find(m => m.url === item.url) && (
+                      <div className="absolute top-1 right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                        <Check className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+                
+                {galleryItems.length === 0 && (
+                  <div className="col-span-3 py-20 text-center text-muted-foreground">
+                    <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Ketuk tombol di atas untuk memilih foto/video</p>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
