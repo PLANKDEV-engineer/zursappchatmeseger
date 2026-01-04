@@ -13,10 +13,25 @@ interface MessageWithReactions extends MessageType {
 export function useMessages(chatId: string | undefined, userId: string | undefined) {
   const [messages, setMessages] = useState<MessageWithReactions[]>([]);
   const [loading, setLoading] = useState(true);
+  const [otherParticipantIds, setOtherParticipantIds] = useState<string[]>([]);
+
+  const fetchOtherParticipants = useCallback(async () => {
+    if (!chatId || !userId) return;
+
+    const { data, error } = await supabase
+      .from('chat_participants')
+      .select('user_id')
+      .eq('chat_id', chatId)
+      .neq('user_id', userId);
+
+    if (!error) {
+      setOtherParticipantIds((data || []).map((p) => p.user_id));
+    }
+  }, [chatId, userId]);
 
   const fetchMessages = useCallback(async () => {
     if (!chatId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -27,13 +42,13 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
         .eq('chat_id', chatId)
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
-      
+
       if (error) throw error;
-      
+
       // Fetch sender profiles
       const messagesWithProfiles: MessageWithReactions[] = [];
       const profileCache: Record<string, { name: string; avatar_url: string | null }> = {};
-      
+
       for (const msg of data || []) {
         if (msg.sender_id && !profileCache[msg.sender_id]) {
           const { data: profile } = await supabase
@@ -41,39 +56,45 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
             .select('name, avatar_url')
             .eq('user_id', msg.sender_id)
             .single();
-          
+
           if (profile) {
             profileCache[msg.sender_id] = profile;
           }
         }
-        
+
         messagesWithProfiles.push({
           ...msg,
           reactions: msg.message_reactions || [],
           senderProfile: msg.sender_id ? profileCache[msg.sender_id] : undefined,
         });
       }
-      
+
       setMessages(messagesWithProfiles);
-      
-      // Mark messages as read and update status to 'read' for sender
+
       if (userId) {
+        // Reset unread count
         await supabase
           .from('chat_participants')
           .update({ unread_count: 0 })
           .eq('chat_id', chatId)
           .eq('user_id', userId);
-        
-        // Update message status to 'read' for messages from other users
+
+        // When we are online and have received messages, consider them "delivered" first.
+        const receivedSentIds = messagesWithProfiles
+          .filter((m) => m.sender_id !== userId && m.status === 'sent')
+          .map((m) => m.id);
+
+        if (receivedSentIds.length > 0) {
+          await supabase.from('messages').update({ status: 'delivered' }).in('id', receivedSentIds);
+        }
+
+        // Mark as read when we open the room
         const unreadMessageIds = messagesWithProfiles
-          .filter(m => m.sender_id !== userId && m.status !== 'read')
-          .map(m => m.id);
-        
+          .filter((m) => m.sender_id !== userId && m.status !== 'read')
+          .map((m) => m.id);
+
         if (unreadMessageIds.length > 0) {
-          await supabase
-            .from('messages')
-            .update({ status: 'read' })
-            .in('id', unreadMessageIds);
+          await supabase.from('messages').update({ status: 'read' }).in('id', unreadMessageIds);
         }
       }
     } catch (error) {
@@ -84,50 +105,87 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
   }, [chatId, userId]);
 
   useEffect(() => {
+    fetchOtherParticipants();
+  }, [fetchOtherParticipants]);
+
+  useEffect(() => {
     fetchMessages();
-    
+
     if (!chatId) return;
-    
+
     // Subscribe to realtime updates
     const channel = supabase
       .channel(`messages-${chatId}`)
       .on(
         'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
+        {
+          event: 'INSERT',
+          schema: 'public',
           table: 'messages',
-          filter: `chat_id=eq.${chatId}`
+          filter: `chat_id=eq.${chatId}`,
         },
         () => fetchMessages()
       )
       .on(
         'postgres_changes',
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
+        {
+          event: 'UPDATE',
+          schema: 'public',
           table: 'messages',
-          filter: `chat_id=eq.${chatId}`
+          filter: `chat_id=eq.${chatId}`,
         },
         () => fetchMessages()
       )
       .subscribe();
-    
+
     return () => {
       supabase.removeChannel(channel);
     };
   }, [chatId, fetchMessages]);
 
+  // Delivery upgrade: when the other participant becomes online, upgrade our "sent" -> "delivered".
+  // (Only meaningful for private chats; for groups we keep it simple.)
+  useEffect(() => {
+    if (!chatId || !userId) return;
+    const otherId = otherParticipantIds.length === 1 ? otherParticipantIds[0] : null;
+    if (!otherId) return;
+
+    const channel = supabase
+      .channel(`delivery-${chatId}-${otherId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `user_id=eq.${otherId}`,
+        },
+        async (payload) => {
+          if (payload?.new?.is_online) {
+            await supabase
+              .from('messages')
+              .update({ status: 'delivered' })
+              .eq('chat_id', chatId)
+              .eq('sender_id', userId)
+              .eq('status', 'sent');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatId, otherParticipantIds, userId]);
+
   const sendMessage = async (
-    content: string, 
+    content: string,
     type: 'text' | 'image' | 'video' | 'voice' | 'file' | 'poll' = 'text',
     mediaUrl?: string,
     replyToId?: string
   ) => {
     if (!chatId || !userId) return { error: new Error('Missing required data') };
-    
-    // Check if recipient is online to determine initial status
-    // sent = offline, delivered = online, read = when they open chat
+
     const message: TablesInsert<'messages'> = {
       chat_id: chatId,
       sender_id: userId,
@@ -135,41 +193,25 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
       type,
       media_url: mediaUrl,
       reply_to_id: replyToId,
-      status: 'sent', // Start with sent (1 check), will be updated by recipient's presence
+      status: 'sent',
     };
-    
-    const { data, error } = await supabase
-      .from('messages')
-      .insert(message)
-      .select()
-      .single();
 
-    // After insert, check if any recipient is online and update to delivered
-    if (data && !error) {
-      const { data: participants } = await supabase
-        .from('chat_participants')
-        .select('user_id')
-        .eq('chat_id', chatId)
-        .neq('user_id', userId);
+    const { data, error } = await supabase.from('messages').insert(message).select().single();
 
-      if (participants && participants.length > 0) {
-        const recipientIds = participants.map(p => p.user_id);
-        const { data: onlineUsers } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .in('user_id', recipientIds)
-          .eq('is_online', true);
+    // If this is a private chat and the other participant is currently online, upgrade to delivered.
+    if (data && !error && otherParticipantIds.length === 1) {
+      const otherId = otherParticipantIds[0];
+      const { data: otherProfile } = await supabase
+        .from('profiles')
+        .select('is_online')
+        .eq('user_id', otherId)
+        .single();
 
-        if (onlineUsers && onlineUsers.length > 0) {
-          // At least one recipient is online, mark as delivered
-          await supabase
-            .from('messages')
-            .update({ status: 'delivered' })
-            .eq('id', data.id);
-        }
+      if (otherProfile?.is_online) {
+        await supabase.from('messages').update({ status: 'delivered' }).eq('id', data.id);
       }
     }
-    
+
     return { data, error };
   };
 

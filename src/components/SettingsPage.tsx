@@ -28,9 +28,19 @@ import { StarredMessagesPage } from '@/components/StarredMessagesPage';
 
 interface SettingsPageProps {
   onEditProfile: () => void;
+  initialView?: SettingsView;
 }
 
-type SettingsView = 'main' | 'notifications' | 'privacy' | 'security' | 'appearance' | 'help' | 'about' | 'archived' | 'starred';
+type SettingsView =
+  | 'main'
+  | 'notifications'
+  | 'privacy'
+  | 'security'
+  | 'appearance'
+  | 'help'
+  | 'about'
+  | 'archived'
+  | 'starred';
 
 const settingsItems = [
   {
@@ -83,9 +93,9 @@ const settingsItems = [
   },
 ];
 
-export function SettingsPage({ onEditProfile }: SettingsPageProps) {
+export function SettingsPage({ onEditProfile, initialView }: SettingsPageProps) {
   const { profile, signOut, user } = useAuth();
-  const [currentView, setCurrentView] = useState<SettingsView>('main');
+  const [currentView, setCurrentView] = useState<SettingsView>(initialView ?? 'main');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('app_theme');
     return saved !== 'light';

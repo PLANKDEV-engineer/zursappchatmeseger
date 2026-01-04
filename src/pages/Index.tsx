@@ -64,6 +64,7 @@ function AppContent() {
   const [showStatusViewer, setShowStatusViewer] = useState(false);
   const [showCallScreen, setShowCallScreen] = useState(false);
   const [showCameraPage, setShowCameraPage] = useState(false);
+  const [settingsInitialView, setSettingsInitialView] = useState<'main' | 'archived'>('main');
   const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
   const [[page, direction], setPage] = useState([0, 0]);
 
@@ -242,7 +243,14 @@ function AppContent() {
             onAddContact={() => setShowAddContact(true)}
             onAddGroup={() => setShowCreateGroup(true)}
             onAddChannel={() => setShowCreateChannel(true)}
-            onSettings={() => handleNavigate(3)}
+            onSettings={() => {
+              setSettingsInitialView('main');
+              handleNavigate(3);
+            }}
+            onOpenArchived={() => {
+              setSettingsInitialView('archived');
+              handleNavigate(3);
+            }}
             userId={user.id}
             onRefresh={fetchChats}
           />
@@ -262,7 +270,12 @@ function AppContent() {
       case 'calls':
         return <CallsPage onCall={handleCall} />;
       case 'settings':
-        return <SettingsPage onEditProfile={() => setShowEditProfile(true)} />;
+        return (
+          <SettingsPage
+            onEditProfile={() => setShowEditProfile(true)}
+            initialView={settingsInitialView}
+          />
+        );
       case 'admin':
         return isAdmin ? <AdminPanel userId={user.id} onBack={() => handleNavigate(0)} /> : null;
       default:
