@@ -163,6 +163,7 @@ export type Database = {
           is_muted: boolean | null
           is_owner: boolean | null
           is_pinned: boolean | null
+          is_starred: boolean | null
           joined_at: string
           unread_count: number | null
           user_id: string
@@ -175,6 +176,7 @@ export type Database = {
           is_muted?: boolean | null
           is_owner?: boolean | null
           is_pinned?: boolean | null
+          is_starred?: boolean | null
           joined_at?: string
           unread_count?: number | null
           user_id: string
@@ -187,6 +189,7 @@ export type Database = {
           is_muted?: boolean | null
           is_owner?: boolean | null
           is_pinned?: boolean | null
+          is_starred?: boolean | null
           joined_at?: string
           unread_count?: number | null
           user_id?: string
@@ -358,6 +361,50 @@ export type Database = {
           },
         ]
       }
+      message_reports: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          message_id: string
+          reason: string
+          reporter_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          message_id: string
+          reason: string
+          reporter_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          message_id?: string
+          reason?: string
+          reporter_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           chat_id: string
@@ -366,9 +413,11 @@ export type Database = {
           deleted_for_everyone: boolean | null
           id: string
           is_deleted: boolean | null
+          is_starred: boolean | null
           media_url: string | null
           reply_to_id: string | null
           sender_id: string | null
+          starred_by: string[] | null
           status: Database["public"]["Enums"]["message_status"] | null
           type: Database["public"]["Enums"]["message_type"] | null
         }
@@ -379,9 +428,11 @@ export type Database = {
           deleted_for_everyone?: boolean | null
           id?: string
           is_deleted?: boolean | null
+          is_starred?: boolean | null
           media_url?: string | null
           reply_to_id?: string | null
           sender_id?: string | null
+          starred_by?: string[] | null
           status?: Database["public"]["Enums"]["message_status"] | null
           type?: Database["public"]["Enums"]["message_type"] | null
         }
@@ -392,9 +443,11 @@ export type Database = {
           deleted_for_everyone?: boolean | null
           id?: string
           is_deleted?: boolean | null
+          is_starred?: boolean | null
           media_url?: string | null
           reply_to_id?: string | null
           sender_id?: string | null
+          starred_by?: string[] | null
           status?: Database["public"]["Enums"]["message_status"] | null
           type?: Database["public"]["Enums"]["message_type"] | null
         }

@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { Avatar } from '@/components/Avatar';
+import { toast } from 'sonner';
 
 interface PrivacyPageProps {
   onBack: () => void;
@@ -14,9 +14,12 @@ interface PrivacyPageProps {
 
 export function PrivacyPage({ onBack }: PrivacyPageProps) {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [showLastSeen, setShowLastSeen] = useState(true);
-  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
+  const [showLastSeen, setShowLastSeen] = useState(() => {
+    return localStorage.getItem('privacy_last_seen') !== 'false';
+  });
+  const [showOnlineStatus, setShowOnlineStatus] = useState(() => {
+    return localStorage.getItem('privacy_online') !== 'false';
+  });
   const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -29,13 +32,30 @@ export function PrivacyPage({ onBack }: PrivacyPageProps) {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch blocked users
+      const { data: blocked, error } = await supabase
         .from('blocked_users')
-        .select('*, profiles:blocked_id(name, avatar_url)')
+        .select('id, blocked_id, created_at')
         .eq('blocker_id', user.id);
       
       if (error) throw error;
-      setBlockedUsers(data || []);
+
+      // Fetch profiles for each blocked user
+      const enrichedBlocked = [];
+      for (const block of blocked || []) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, avatar_url')
+          .eq('user_id', block.blocked_id)
+          .single();
+        
+        enrichedBlocked.push({
+          ...block,
+          profile,
+        });
+      }
+
+      setBlockedUsers(enrichedBlocked);
     } catch (error) {
       console.error('Error fetching blocked users:', error);
     } finally {
@@ -55,11 +75,17 @@ export function PrivacyPage({ onBack }: PrivacyPageProps) {
 
       if (error) throw error;
 
-      toast({ title: 'Berhasil', description: 'Pengguna telah di-unblock' });
+      toast.success('Pengguna telah di-unblock');
       fetchBlockedUsers();
     } catch (error) {
-      toast({ title: 'Error', description: 'Gagal unblock pengguna', variant: 'destructive' });
+      toast.error('Gagal unblock pengguna');
     }
+  };
+
+  const handleToggle = (key: string, value: boolean, setter: (v: boolean) => void) => {
+    localStorage.setItem(key, value.toString());
+    setter(value);
+    toast.success('Pengaturan disimpan');
   };
 
   const privacySettings = [
@@ -68,14 +94,14 @@ export function PrivacyPage({ onBack }: PrivacyPageProps) {
       label: 'Tampilkan Terakhir Dilihat',
       description: 'Izinkan orang lain melihat kapan kamu terakhir online',
       value: showLastSeen,
-      onChange: setShowLastSeen,
+      onChange: (v: boolean) => handleToggle('privacy_last_seen', v, setShowLastSeen),
     },
     {
       icon: Eye,
       label: 'Tampilkan Status Online',
       description: 'Izinkan orang lain melihat saat kamu online',
       value: showOnlineStatus,
-      onChange: setShowOnlineStatus,
+      onChange: (v: boolean) => handleToggle('privacy_online', v, setShowOnlineStatus),
     },
   ];
 
@@ -143,11 +169,11 @@ export function PrivacyPage({ onBack }: PrivacyPageProps) {
                 >
                   <div className="flex items-center gap-3">
                     <Avatar
-                      src={blocked.profiles?.avatar_url}
-                      name={blocked.profiles?.name}
+                      src={blocked.profile?.avatar_url}
+                      name={blocked.profile?.name}
                       size="md"
                     />
-                    <span className="font-medium">{blocked.profiles?.name || 'Unknown'}</span>
+                    <span className="font-medium">{blocked.profile?.name || 'Unknown'}</span>
                   </div>
                   <Button
                     variant="outline"
