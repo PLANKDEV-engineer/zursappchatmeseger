@@ -19,6 +19,7 @@ import {
   Download,
   Search,
   Star,
+  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
@@ -37,6 +38,7 @@ import { SwipeableMessage } from '@/components/SwipeableMessage';
 import { GroupChannelInfo } from '@/components/GroupChannelInfo';
 import { SearchMessagesSheet } from '@/components/SearchMessagesSheet';
 import { ReportMessageModal } from '@/components/ReportMessageModal';
+import { LocationShare } from '@/components/LocationShare';
 import { toast } from 'sonner';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
@@ -82,6 +84,7 @@ export function ChatRoom({
   const [forwardMessageContent, setForwardMessageContent] = useState('');
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const [chatWallpaper, setChatWallpaper] = useState<string | null>(null);
+  const [showLocationShare, setShowLocationShare] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -727,6 +730,9 @@ export function ChatRoom({
             <Button variant="ghost" size="icon" onClick={() => setShowMediaUpload(true)}>
               <Paperclip className="w-5 h-5" />
             </Button>
+            <Button variant="ghost" size="icon" onClick={() => setShowLocationShare(true)}>
+              <MapPin className="w-5 h-5" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowPollCreator(true)}>
               <BarChart3 className="w-5 h-5" />
             </Button>
@@ -824,7 +830,17 @@ export function ChatRoom({
         onCreatePoll={handlePollCreate}
       />
 
-      {/* Chat Options Menu (3-dot menu) - for private chats */}
+      {/* Location Share Modal */}
+      <LocationShare
+        isOpen={showLocationShare}
+        onClose={() => setShowLocationShare(false)}
+        onShare={async (location) => {
+          const locationMessage = `📍 Lokasi: ${location.address}\n\nhttps://www.google.com/maps?q=${location.lat},${location.lng}`;
+          await sendMessage(locationMessage, 'text');
+          setShowLocationShare(false);
+        }}
+      />
+
       {chat.type === 'private' && otherUserProfile && (
         <ChatOptionsMenu
           isOpen={showChatOptions}

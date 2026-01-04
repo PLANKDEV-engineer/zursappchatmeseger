@@ -4,6 +4,7 @@ import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import type { ChatWithDetails } from '@/hooks/useChats';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/context/AuthContext';
 
 interface ChatListItemProps {
   chat: ChatWithDetails;
@@ -11,12 +12,16 @@ interface ChatListItemProps {
 }
 
 export function ChatListItem({ chat, onClick }: ChatListItemProps) {
+  const { user } = useAuth();
   const lastMessageTime = chat.lastMessage?.created_at
     ? formatDistanceToNow(new Date(chat.lastMessage.created_at), { addSuffix: false })
     : '';
 
+  // Only show checkmarks for messages sent by current user
+  const isOwnMessage = chat.lastMessage?.sender_id === user?.id;
+
   const getStatusIcon = () => {
-    if (!chat.lastMessage) return null;
+    if (!chat.lastMessage || !isOwnMessage) return null;
     
     switch (chat.lastMessage.status) {
       case 'sent':

@@ -134,11 +134,88 @@ export function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-dark flex flex-col scan-line tech-grid">
-      {/* Decorative elements */}
+    <div className="min-h-screen bg-gradient-dark flex flex-col relative overflow-hidden">
+      {/* Animated tech background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+        {/* Animated grid */}
+        <div className="absolute inset-0 tech-grid opacity-30" />
+        
+        {/* Floating orbs */}
+        <motion.div 
+          className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-3xl"
+          animate={{ 
+            x: [0, 50, 0], 
+            y: [0, -30, 0],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div 
+          className="absolute bottom-20 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl"
+          animate={{ 
+            x: [0, -50, 0], 
+            y: [0, 30, 0],
+            scale: [1.2, 1, 1.2],
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl"
+          animate={{ 
+            scale: [1, 1.3, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        />
+        
+        {/* Animated lines */}
+        <svg className="absolute inset-0 w-full h-full opacity-20">
+          <motion.line 
+            x1="0%" y1="30%" x2="100%" y2="70%" 
+            stroke="hsl(var(--primary))" 
+            strokeWidth="1"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: [0, 1, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.line 
+            x1="100%" y1="20%" x2="0%" y2="80%" 
+            stroke="hsl(var(--accent))" 
+            strokeWidth="1"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: [0, 1, 0] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          />
+        </svg>
+        
+        {/* Floating particles */}
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-primary/50 rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, -100, 0],
+              opacity: [0, 1, 0],
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              repeat: Infinity,
+              delay: Math.random() * 2,
+              ease: "easeInOut",
+            }}
+          />
+        ))}
+        
+        {/* Scan line effect */}
+        <motion.div
+          className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent"
+          animate={{ top: ["-5%", "105%"] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+        />
       </div>
 
       {/* Header */}
@@ -153,7 +230,25 @@ export function AuthPage() {
           </Button>
         )}
         <div className="flex-1 flex justify-center">
-          <Logo size="lg" />
+          {/* Animated Logo */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative"
+          >
+            <motion.div
+              animate={{ 
+                textShadow: [
+                  "0 0 20px hsl(var(--primary))",
+                  "0 0 40px hsl(var(--primary))",
+                  "0 0 20px hsl(var(--primary))",
+                ]
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Logo size="lg" />
+            </motion.div>
+          </motion.div>
         </div>
         {step !== 'choice' && <div className="w-10" />}
       </header>
@@ -172,12 +267,50 @@ export function AuthPage() {
               className="w-full max-w-md space-y-8"
             >
               <div className="text-center space-y-4">
-                <h1 className="text-4xl font-display font-bold text-gradient-primary">
-                  Welcome to ZursApp
-                </h1>
-                <p className="text-muted-foreground text-lg">
+                <motion.h1 
+                  className="text-4xl font-display font-bold relative"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                >
+                  <motion.span
+                    className="text-gradient-primary inline-block"
+                    animate={{
+                      backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+                    }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    style={{
+                      backgroundSize: "200% 200%",
+                    }}
+                  >
+                    Welcome to{" "}
+                  </motion.span>
+                  <motion.span 
+                    className="text-gradient-primary inline-block relative"
+                    animate={{
+                      textShadow: [
+                        "0 0 10px hsl(var(--primary) / 0.5)",
+                        "0 0 30px hsl(var(--primary) / 0.8)",
+                        "0 0 10px hsl(var(--primary) / 0.5)",
+                      ],
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    ZursApp
+                    <motion.span
+                      className="absolute -inset-1 bg-primary/20 rounded-lg blur-md -z-10"
+                      animate={{ opacity: [0.3, 0.7, 0.3] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                  </motion.span>
+                </motion.h1>
+                <motion.p 
+                  className="text-muted-foreground text-lg"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
                   The next generation messaging platform
-                </p>
+                </motion.p>
               </div>
 
               <div className="space-y-4 pt-8">
