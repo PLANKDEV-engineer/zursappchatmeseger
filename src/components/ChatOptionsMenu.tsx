@@ -10,6 +10,9 @@ import {
   Reply,
   Smile,
   X,
+  Star,
+  Archive,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -20,8 +23,11 @@ interface ChatOptionsMenuProps {
   onDeleteChat: () => void;
   onBlock: () => void;
   onReport: () => void;
+  onArchive?: () => void;
+  onSearch?: () => void;
   userName: string;
   isBlocked: boolean;
+  isArchived?: boolean;
 }
 
 export function ChatOptionsMenu({
@@ -31,11 +37,21 @@ export function ChatOptionsMenu({
   onDeleteChat,
   onBlock,
   onReport,
+  onArchive,
+  onSearch,
   userName,
   isBlocked,
+  isArchived,
 }: ChatOptionsMenuProps) {
   const menuItems = [
     { icon: User, label: 'Lihat Profil', onClick: onViewProfile, color: 'text-foreground' },
+    ...(onSearch ? [{ icon: Search, label: 'Cari Pesan', onClick: onSearch, color: 'text-foreground' }] : []),
+    ...(onArchive ? [{ 
+      icon: Archive, 
+      label: isArchived ? 'Batal Arsip' : 'Arsipkan Chat', 
+      onClick: onArchive, 
+      color: 'text-foreground' 
+    }] : []),
     { icon: Trash2, label: 'Hapus Chat', onClick: onDeleteChat, color: 'text-foreground' },
     { 
       icon: Ban, 
@@ -109,8 +125,11 @@ interface MessageMenuProps {
   onCopy: () => void;
   onForward: () => void;
   onDelete: (forEveryone: boolean) => void;
+  onStar?: () => void;
+  onReport?: () => void;
   isOwnMessage: boolean;
   messageContent: string;
+  isStarred?: boolean;
 }
 
 export function MessageMenu({
@@ -121,8 +140,11 @@ export function MessageMenu({
   onCopy,
   onForward,
   onDelete,
+  onStar,
+  onReport,
   isOwnMessage,
   messageContent,
+  isStarred,
 }: MessageMenuProps) {
   const [showDeleteOptions, setShowDeleteOptions] = useState(false);
 
@@ -131,6 +153,7 @@ export function MessageMenu({
     { icon: Smile, label: 'Reaksi', onClick: onReact },
     { icon: Copy, label: 'Salin', onClick: onCopy },
     { icon: Forward, label: 'Teruskan', onClick: onForward },
+    ...(onStar ? [{ icon: Star, label: isStarred ? 'Hapus Bintang' : 'Bintangi', onClick: onStar }] : []),
   ];
 
   return (
@@ -178,6 +201,19 @@ export function MessageMenu({
                       </button>
                     ))}
                   </div>
+                  
+                  {!isOwnMessage && onReport && (
+                    <button
+                      onClick={() => {
+                        onReport();
+                        onClose();
+                      }}
+                      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-muted transition-colors text-orange-500"
+                    >
+                      <Flag className="w-5 h-5" />
+                      <span className="font-medium">Laporkan Pesan</span>
+                    </button>
+                  )}
                   
                   <button
                     onClick={() => setShowDeleteOptions(true)}

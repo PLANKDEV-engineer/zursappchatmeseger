@@ -126,6 +126,8 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
   ) => {
     if (!chatId || !userId) return { error: new Error('Missing required data') };
     
+    // Check if recipient is online to determine initial status
+    // sent = offline, delivered = online, read = when they open chat
     const message: TablesInsert<'messages'> = {
       chat_id: chatId,
       sender_id: userId,
@@ -133,7 +135,7 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
       type,
       media_url: mediaUrl,
       reply_to_id: replyToId,
-      status: 'sent',
+      status: 'sent', // Start with sent (1 check), will be updated by recipient's presence
     };
     
     const { data, error } = await supabase
@@ -141,6 +143,32 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
       .insert(message)
       .select()
       .single();
+
+    // After insert, check if any recipient is online and update to delivered
+    if (data && !error) {
+      const { data: participants } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('chat_id', chatId)
+        .neq('user_id', userId);
+
+      if (participants && participants.length > 0) {
+        const recipientIds = participants.map(p => p.user_id);
+        const { data: onlineUsers } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .in('user_id', recipientIds)
+          .eq('is_online', true);
+
+        if (onlineUsers && onlineUsers.length > 0) {
+          // At least one recipient is online, mark as delivered
+          await supabase
+            .from('messages')
+            .update({ status: 'delivered' })
+            .eq('id', data.id);
+        }
+      }
+    }
     
     return { data, error };
   };

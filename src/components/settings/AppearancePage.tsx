@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Moon, Sun, Palette, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
 
 interface AppearancePageProps {
   onBack: () => void;
@@ -23,9 +24,61 @@ const wallpapers = [
 ];
 
 export function AppearancePage({ onBack }: AppearancePageProps) {
-  const [selectedTheme, setSelectedTheme] = useState('dark');
-  const [selectedWallpaper, setSelectedWallpaper] = useState('default');
-  const [largeFont, setLargeFont] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState(() => {
+    return localStorage.getItem('app_theme') || 'dark';
+  });
+  const [selectedWallpaper, setSelectedWallpaper] = useState(() => {
+    return localStorage.getItem('chat_wallpaper') || 'default';
+  });
+  const [largeFont, setLargeFont] = useState(() => {
+    return localStorage.getItem('large_font') === 'true';
+  });
+
+  const handleThemeChange = (themeId: string) => {
+    setSelectedTheme(themeId);
+    localStorage.setItem('app_theme', themeId);
+    
+    // Apply theme
+    if (themeId === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+    
+    toast.success(`Tema ${themes.find(t => t.id === themeId)?.name} diterapkan`);
+  };
+
+  const handleWallpaperChange = (wpId: string) => {
+    setSelectedWallpaper(wpId);
+    localStorage.setItem('chat_wallpaper', wpId);
+    toast.success('Wallpaper chat diterapkan');
+  };
+
+  const handleFontToggle = (value: boolean) => {
+    setLargeFont(value);
+    localStorage.setItem('large_font', value.toString());
+    
+    if (value) {
+      document.documentElement.classList.add('large-font');
+    } else {
+      document.documentElement.classList.remove('large-font');
+    }
+    
+    toast.success(value ? 'Font besar diaktifkan' : 'Font normal');
+  };
+
+  // Apply saved settings on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('app_theme');
+    if (savedTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    }
+    
+    const savedFont = localStorage.getItem('large_font') === 'true';
+    if (savedFont) {
+      document.documentElement.classList.add('large-font');
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -48,7 +101,7 @@ export function AppearancePage({ onBack }: AppearancePageProps) {
                 key={theme.id}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedTheme(theme.id)}
+                onClick={() => handleThemeChange(theme.id)}
                 className={`p-4 rounded-xl border-2 transition-all ${
                   selectedTheme === theme.id
                     ? 'border-primary bg-primary/10'
@@ -74,7 +127,7 @@ export function AppearancePage({ onBack }: AppearancePageProps) {
                 key={wp.id}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setSelectedWallpaper(wp.id)}
+                onClick={() => handleWallpaperChange(wp.id)}
                 className={`aspect-square rounded-xl border-2 transition-all ${wp.color} ${
                   selectedWallpaper === wp.id
                     ? 'border-primary'
@@ -97,7 +150,7 @@ export function AppearancePage({ onBack }: AppearancePageProps) {
           </div>
           <Switch
             checked={largeFont}
-            onCheckedChange={setLargeFont}
+            onCheckedChange={handleFontToggle}
           />
         </motion.div>
       </main>

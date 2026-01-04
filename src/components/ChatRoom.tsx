@@ -17,6 +17,8 @@ import {
   CheckCheck,
   FileText,
   Download,
+  Search,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/Avatar';
@@ -33,6 +35,9 @@ import { ReportModal } from '@/components/ReportModal';
 import { ForwardModal } from '@/components/ForwardModal';
 import { SwipeableMessage } from '@/components/SwipeableMessage';
 import { GroupChannelInfo } from '@/components/GroupChannelInfo';
+import { SearchMessagesSheet } from '@/components/SearchMessagesSheet';
+import { ReportMessageModal } from '@/components/ReportMessageModal';
+import { toast } from 'sonner';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
 interface ChatRoomProps {
@@ -71,9 +76,13 @@ export function ChatRoom({
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showReportMessage, setShowReportMessage] = useState(false);
+  const [reportMessageData, setReportMessageData] = useState<{ id: string; content: string; senderName: string } | null>(null);
   const [forwardMessageContent, setForwardMessageContent] = useState('');
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -231,6 +240,82 @@ export function ChatRoom({
       content: message.content || '',
       senderName: message.senderProfile?.name
     });
+  };
+
+  const handleStarMessage = async (messageId: string) => {
+    const message = messages.find(m => m.id === messageId);
+    if (!message) return;
+
+    try {
+      const { data: currentMsg } = await supabase
+        .from('messages')
+        .select('starred_by')
+        .eq('id', messageId)
+        .single();
+
+      const currentStarred = (currentMsg?.starred_by as string[]) || [];
+      const isCurrentlyStarred = currentStarred.includes(userId);
+      
+      const newStarred = isCurrentlyStarred
+        ? currentStarred.filter(id => id !== userId)
+        : [...currentStarred, userId];
+
+      const { error } = await supabase
+        .from('messages')
+        .update({ starred_by: newStarred })
+        .eq('id', messageId);
+
+      if (error) throw error;
+
+      toast.success(isCurrentlyStarred ? 'Bintang dihapus' : 'Pesan ditandai bintang');
+    } catch (error) {
+      toast.error('Gagal menandai pesan');
+    }
+  };
+
+  const handleReportMessage = (message: any) => {
+    setReportMessageData({
+      id: message.id,
+      content: message.content || 'Media',
+      senderName: message.senderProfile?.name || 'Unknown',
+    });
+    setShowReportMessage(true);
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    const element = messageRefs.current[messageId];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('bg-primary/20');
+      setTimeout(() => {
+        element.classList.remove('bg-primary/20');
+      }, 2000);
+    }
+  };
+
+  const handleArchiveChat = async () => {
+    try {
+      const { data: participant } = await supabase
+        .from('chat_participants')
+        .select('is_archived')
+        .eq('chat_id', chat.id)
+        .eq('user_id', userId)
+        .single();
+
+      const isCurrentlyArchived = participant?.is_archived || false;
+
+      const { error } = await supabase
+        .from('chat_participants')
+        .update({ is_archived: !isCurrentlyArchived })
+        .eq('chat_id', chat.id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      toast.success(isCurrentlyArchived ? 'Chat dipulihkan' : 'Chat diarsipkan');
+    } catch (error) {
+      toast.error('Gagal mengarsipkan chat');
+    }
   };
   
   // Logika pengiriman pesan:
@@ -442,6 +527,9 @@ export function ChatRoom({
           </button>
 
           <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon-sm" onClick={() => setShowSearch(true)}>
+              <Search className="w-5 h-5" />
+            </Button>
             <Button variant="ghost" size="icon-sm" onClick={onVideoCall}>
               <Video className="w-5 h-5" />
             </Button>
@@ -490,7 +578,8 @@ export function ChatRoom({
                   )}
 
                   <div
-                    className={`max-w-[75%] ${isMe ? 'message-sent' : 'message-received'} px-4 py-2 relative`}
+                    ref={(el) => { messageRefs.current[message.id] = el; }}
+                    className={`max-w-[75%] ${isMe ? 'message-sent' : 'message-received'} px-4 py-2 relative transition-colors duration-500`}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setSelectedMessage(message.id);
@@ -797,8 +886,21 @@ export function ChatRoom({
           if (selectedMessage) deleteMessage(selectedMessage, forEveryone);
           setSelectedMessage(null);
         }}
+        onStar={() => {
+          if (selectedMessage) handleStarMessage(selectedMessage);
+          setSelectedMessage(null);
+        }}
+        onReport={() => {
+          const msg = messages.find(m => m.id === selectedMessage);
+          if (msg) handleReportMessage(msg);
+          setSelectedMessage(null);
+        }}
         isOwnMessage={messages.find(m => m.id === selectedMessage)?.sender_id === userId}
         messageContent={messages.find(m => m.id === selectedMessage)?.content || ''}
+        isStarred={(() => {
+          const msg = messages.find(m => m.id === selectedMessage);
+          return (msg as any)?.starred_by?.includes(userId) || false;
+        })()}
       />
 
       {/* Reaction Picker */}
@@ -856,6 +958,29 @@ export function ChatRoom({
         messageContent={forwardMessageContent}
         userId={userId}
       />
+
+      {/* Search Messages Sheet */}
+      <SearchMessagesSheet
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+        chatId={chat.id}
+        onScrollToMessage={scrollToMessage}
+      />
+
+      {/* Report Message Modal */}
+      {reportMessageData && (
+        <ReportMessageModal
+          isOpen={showReportMessage}
+          onClose={() => {
+            setShowReportMessage(false);
+            setReportMessageData(null);
+          }}
+          messageId={reportMessageData.id}
+          messageContent={reportMessageData.content}
+          senderName={reportMessageData.senderName}
+          userId={userId}
+        />
+      )}
     </div>
   );
 }

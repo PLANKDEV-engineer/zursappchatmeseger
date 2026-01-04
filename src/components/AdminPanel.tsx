@@ -8,13 +8,14 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { ChatAdminPanel } from '@/components/ChatAdminPanel';
+import { MessageAdminPanel } from '@/components/MessageAdminPanel';
 
 interface AdminPanelProps {
   userId: string;
   onBack: () => void;
 }
 
-type Tab = 'users' | 'reports' | 'appeals' | 'chats';
+type Tab = 'users' | 'reports' | 'appeals' | 'chats' | 'messages';
 
 export function AdminPanel({ userId, onBack }: AdminPanelProps) {
   const { isAdmin } = useAuth();
@@ -104,6 +105,7 @@ export function AdminPanel({ userId, onBack }: AdminPanelProps) {
     { id: 'reports' as Tab, label: 'Laporan', icon: AlertTriangle, count: reports.filter(r => r.status === 'pending').length },
     { id: 'appeals' as Tab, label: 'Banding', icon: MessageSquare, count: appeals.length },
     { id: 'chats' as Tab, label: 'Grup/Saluran', icon: Radio, count: 0 },
+    { id: 'messages' as Tab, label: 'Pesan', icon: MessageSquare, count: 0 },
   ];
 
   // If chats tab is selected, render the ChatAdminPanel
@@ -114,6 +116,28 @@ export function AdminPanel({ userId, onBack }: AdminPanelProps) {
         isAdmin={isAdmin}
         onBack={() => setActiveTab('users')}
       />
+    );
+  }
+
+  // If messages tab is selected, render the MessageAdminPanel
+  if (activeTab === 'messages') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="sticky top-0 z-30 bg-background-secondary/95 backdrop-blur-xl border-b border-border/50">
+          <div className="flex items-center gap-3 p-4">
+            <Button variant="ghost" size="icon-sm" onClick={() => setActiveTab('users')}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-6 h-6 text-primary" />
+              <h1 className="text-xl font-display font-bold">Laporan Pesan</h1>
+            </div>
+          </div>
+        </header>
+        <main className="flex-1 p-4">
+          <MessageAdminPanel />
+        </main>
+      </div>
     );
   }
 

@@ -1,17 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Shield, Lock, Key, Fingerprint } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
 
 interface SecurityPageProps {
   onBack: () => void;
 }
 
 export function SecurityPage({ onBack }: SecurityPageProps) {
-  const [twoFactorEnabled, setTwoFactorEnabled] = React.useState(false);
-  const [appLockEnabled, setAppLockEnabled] = React.useState(false);
-  const [biometricEnabled, setBiometricEnabled] = React.useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(() => {
+    return localStorage.getItem('security_2fa') === 'true';
+  });
+  const [appLockEnabled, setAppLockEnabled] = useState(() => {
+    return localStorage.getItem('security_app_lock') === 'true';
+  });
+  const [biometricEnabled, setBiometricEnabled] = useState(() => {
+    return localStorage.getItem('security_biometric') === 'true';
+  });
+
+  const handleToggle = (key: string, value: boolean, setter: (v: boolean) => void) => {
+    localStorage.setItem(key, value.toString());
+    setter(value);
+    toast.success(value ? 'Fitur diaktifkan' : 'Fitur dinonaktifkan');
+  };
 
   const securityItems = [
     {
@@ -19,21 +32,21 @@ export function SecurityPage({ onBack }: SecurityPageProps) {
       label: 'Verifikasi 2 Langkah',
       description: 'Tambahkan lapisan keamanan ekstra dengan PIN',
       value: twoFactorEnabled,
-      onChange: setTwoFactorEnabled,
+      onChange: (v: boolean) => handleToggle('security_2fa', v, setTwoFactorEnabled),
     },
     {
       icon: Lock,
       label: 'Kunci Aplikasi',
       description: 'Kunci aplikasi dengan PIN atau pola',
       value: appLockEnabled,
-      onChange: setAppLockEnabled,
+      onChange: (v: boolean) => handleToggle('security_app_lock', v, setAppLockEnabled),
     },
     {
       icon: Fingerprint,
       label: 'Biometrik',
       description: 'Buka kunci dengan sidik jari atau wajah',
       value: biometricEnabled,
-      onChange: setBiometricEnabled,
+      onChange: (v: boolean) => handleToggle('security_biometric', v, setBiometricEnabled),
     },
   ];
 
@@ -93,6 +106,19 @@ export function SecurityPage({ onBack }: SecurityPageProps) {
             </motion.div>
           ))}
         </div>
+
+        {/* Additional info */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="p-4 rounded-xl bg-muted/50 border border-border/50"
+        >
+          <p className="text-sm text-muted-foreground">
+            Catatan: Beberapa fitur keamanan lanjutan seperti verifikasi 2 langkah dan biometrik 
+            memerlukan pengaturan tambahan di perangkat Anda.
+          </p>
+        </motion.div>
       </main>
     </div>
   );
