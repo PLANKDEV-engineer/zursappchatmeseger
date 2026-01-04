@@ -95,8 +95,63 @@
     --sidebar-ring: 187 85% 53%;
   }
 
-  .dark {
-    /* Same as root - app is dark by default */
+  .light {
+    /* Light theme */
+    --background: 0 0% 100%;
+    --background-secondary: 0 0% 98%;
+    --background-tertiary: 0 0% 96%;
+    
+    --foreground: 222 47% 11%;
+    --foreground-muted: 215 16% 47%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --card-hover: 0 0% 96%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    
+    --primary: 187 85% 43%;
+    --primary-glow: 187 85% 53%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 220 14% 50%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    
+    --accent: 217 91% 50%;
+    --accent-glow: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
+    
+    --success: 142 76% 36%;
+    --success-glow: 142 76% 46%;
+    --success-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --online: 142 76% 36%;
+    --offline: 215 16% 65%;
+    
+    --border: 220 13% 91%;
+    --border-glow: 187 85% 43%;
+    --input: 220 13% 91%;
+    --ring: 187 85% 43%;
+    
+    --shadow-glow: 0 0 20px hsla(187 85% 43% / 0.2);
+    --shadow-glow-sm: 0 0 10px hsla(187 85% 43% / 0.15);
+    --shadow-card: 0 4px 20px hsla(0 0% 0% / 0.08);
+    
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 187 85% 43%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 187 85% 43%;
   }
 }
 

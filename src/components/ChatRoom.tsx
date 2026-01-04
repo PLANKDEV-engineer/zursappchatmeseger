@@ -81,6 +81,7 @@ export function ChatRoom({
   const [reportMessageData, setReportMessageData] = useState<{ id: string; content: string; senderName: string } | null>(null);
   const [forwardMessageContent, setForwardMessageContent] = useState('');
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
+  const [chatWallpaper, setChatWallpaper] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -210,6 +211,19 @@ export function ChatRoom({
     };
     fetchOtherUserProfile();
   }, [chat.id, chat.type, userId]);
+
+  // Load wallpaper settings
+  useEffect(() => {
+    // Check per-chat wallpaper first
+    const chatWallpapers = JSON.parse(localStorage.getItem('chat_wallpapers') || '{}');
+    if (chatWallpapers[chat.id]) {
+      setChatWallpaper(chatWallpapers[chat.id]);
+    } else {
+      // Fall back to global wallpaper
+      const globalWallpaper = localStorage.getItem('global_chat_wallpaper');
+      setChatWallpaper(globalWallpaper);
+    }
+  }, [chat.id]);
 
   const handleBlock = async () => {
     if (!otherUserProfile) return;
@@ -486,6 +500,30 @@ export function ChatRoom({
     return <p className="text-sm whitespace-pre-wrap">{parseTextWithLinks(message.content)}</p>;
   };
 
+  // Wallpaper helper functions
+  const getWallpaperClass = () => {
+    if (!chatWallpaper || chatWallpaper === 'default') return 'tech-grid';
+    if (chatWallpaper === 'gradient1') return 'bg-gradient-to-br from-blue-900 to-cyan-700';
+    if (chatWallpaper === 'gradient2') return 'bg-gradient-to-br from-orange-600 to-pink-600';
+    if (chatWallpaper === 'gradient3') return 'bg-gradient-to-br from-green-900 to-emerald-600';
+    if (chatWallpaper === 'gradient4') return 'bg-gradient-to-br from-purple-900 to-indigo-600';
+    if (chatWallpaper === 'gradient5') return 'bg-gradient-to-br from-slate-900 to-slate-700';
+    if (chatWallpaper === 'gradient6') return 'bg-gradient-to-br from-cyan-500 to-blue-600';
+    if (chatWallpaper === 'pattern1') return 'tech-grid bg-background';
+    return '';
+  };
+
+  const getWallpaperStyle = (): React.CSSProperties => {
+    if (chatWallpaper?.startsWith('data:image')) {
+      return {
+        backgroundImage: `url(${chatWallpaper})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      };
+    }
+    return {};
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -544,7 +582,10 @@ export function ChatRoom({
       </header>
 
       {/* Messages */}
-      <main className="flex-1 overflow-y-auto p-4 space-y-4 tech-grid">
+      <main 
+        className={`flex-1 overflow-y-auto p-4 space-y-4 ${getWallpaperClass()}`}
+        style={getWallpaperStyle()}
+      >
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />

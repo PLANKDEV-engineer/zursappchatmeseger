@@ -42,15 +42,28 @@ export default function JoinPage() {
   }, [chatId, user]);
 
   const fetchChatInfo = async () => {
+    if (!chatId) return;
+    
     try {
-      // Try to find chat by ID or invite_link
-      const { data: chat, error: chatError } = await supabase
+      // First try to find by exact ID
+      let { data: chat, error: chatError } = await supabase
         .from('chats')
         .select('*')
-        .or(`id.eq.${chatId},invite_link.ilike.%${chatId}%`)
-        .single();
+        .eq('id', chatId)
+        .maybeSingle();
 
-      if (chatError || !chat) {
+      // If not found by ID, try by invite_link
+      if (!chat) {
+        const { data: chatByLink } = await supabase
+          .from('chats')
+          .select('*')
+          .ilike('invite_link', `%${chatId}%`)
+          .maybeSingle();
+        
+        chat = chatByLink;
+      }
+
+      if (!chat) {
         setError('Grup atau saluran tidak ditemukan');
         setLoading(false);
         return;
