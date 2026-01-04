@@ -19,6 +19,7 @@ import { CallScreen } from '@/components/CallScreen';
 import { BottomNav } from '@/components/BottomNav';
 import { BlockedScreen } from '@/components/BlockedScreen';
 import { CameraPage } from '@/components/CameraPage';
+import { NotificationPrompt } from '@/components/NotificationPrompt';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +27,7 @@ import { useChats, type ChatWithDetails } from '@/hooks/useChats';
 import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 import { useCalls } from '@/hooks/useCalls';
 import { usePresence } from '@/hooks/usePresence';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
 
@@ -47,9 +49,15 @@ function AppContent() {
   const { chats, fetchChats, createPrivateChat, createGroupChat } = useChats(user?.id);
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
+  const { registerServiceWorker, isSubscribed: isPushSubscribed } = usePushNotifications(user?.id);
   
   // Initialize presence tracking
   usePresence(user?.id);
+
+  // Register service worker on mount
+  useEffect(() => {
+    registerServiceWorker();
+  }, [registerServiceWorker]);
   
   // ALL useState hooks MUST be called before any early returns
   const [currentView, setCurrentView] = useState<View>('chats');
@@ -64,9 +72,23 @@ function AppContent() {
   const [showStatusViewer, setShowStatusViewer] = useState(false);
   const [showCallScreen, setShowCallScreen] = useState(false);
   const [showCameraPage, setShowCameraPage] = useState(false);
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [settingsInitialView, setSettingsInitialView] = useState<'main' | 'archived'>('main');
   const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
   const [[page, direction], setPage] = useState([0, 0]);
+
+  // Show notification prompt after first login if not subscribed
+  useEffect(() => {
+    if (user && !isPushSubscribed && 'Notification' in window && Notification.permission === 'default') {
+      const hasShownPrompt = localStorage.getItem('push_prompt_shown');
+      if (!hasShownPrompt) {
+        setTimeout(() => {
+          setShowNotificationPrompt(true);
+          localStorage.setItem('push_prompt_shown', 'true');
+        }, 3000);
+      }
+    }
+  }, [user, isPushSubscribed]);
 
   // Filter channels from chat list - channels only appear in Status page
   const privateAndGroupChats = chats.filter(c => c.type !== 'channel');
@@ -390,6 +412,13 @@ function AppContent() {
           />
         )}
       </AnimatePresence>
+
+      {/* Notification Prompt */}
+      <NotificationPrompt
+        userId={user.id}
+        isOpen={showNotificationPrompt}
+        onClose={() => setShowNotificationPrompt(false)}
+      />
     </div>
   );
 }
