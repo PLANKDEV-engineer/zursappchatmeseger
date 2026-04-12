@@ -28,6 +28,7 @@ import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 import { useCalls } from '@/hooks/useCalls';
 import { usePresence } from '@/hooks/usePresence';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useWebRTC } from '@/hooks/useWebRTC';
 
 type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
 
@@ -50,6 +51,7 @@ function AppContent() {
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
   const { registerServiceWorker, isSubscribed: isPushSubscribed } = usePushNotifications(user?.id);
+  const webRTC = useWebRTC(user?.id);
   
   // Initialize presence tracking
   usePresence(user?.id);
@@ -220,24 +222,53 @@ function AppContent() {
   };
 
   const handleCall = async (receiverId: string, type: 'voice' | 'video') => {
-    const { data } = await initiateCall(receiverId, type);
-    if (data) {
+    if (!receiverId) {
+      // For group chats, get the other user
+      return;
+    }
+    try {
+      // Get receiver profile
+      const { data: receiverProfile } = await supabase
+        .from('profiles')
+        .select('name, avatar_url')
+        .eq('user_id', receiverId)
+        .single();
+
       setCallInfo({
         type,
-        name: data.receiverProfile?.name || 'Unknown',
-        avatar: data.receiverProfile?.avatar_url || undefined,
+        name: receiverProfile?.name || 'Unknown',
+        avatar: receiverProfile?.avatar_url || undefined,
       });
       setShowCallScreen(true);
+      
+      await webRTC.startCall(receiverId, type);
+    } catch (err: any) {
+      console.error('Call failed:', err);
+      setShowCallScreen(false);
+      setCallInfo(null);
     }
   };
 
+  const handleAnswerCall = async () => {
+    await webRTC.answerCall();
+  };
+
   const handleEndCall = async () => {
-    if (activeCall) {
-      await endCall(activeCall.id);
-    }
+    webRTC.endCall();
     setShowCallScreen(false);
     setCallInfo(null);
   };
+
+  // Handle incoming calls
+  useEffect(() => {
+    if (webRTC.incomingCall) {
+      setCallInfo({
+        type: webRTC.incomingCall.callType,
+        name: webRTC.incomingCall.callerName,
+      });
+      setShowCallScreen(true);
+    }
+  }, [webRTC.incomingCall]);
 
   // Slide variants for page transitions
   const slideVariants = {
