@@ -571,10 +571,10 @@ export function ChatRoom({
             <Button variant="ghost" size="icon-sm" onClick={() => setShowSearch(true)}>
               <Search className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={onVideoCall}>
+            <Button variant="ghost" size="icon-sm" onClick={() => onVideoCall(otherUserProfile?.user_id || '')}>
               <Video className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={onCall}>
+            <Button variant="ghost" size="icon-sm" onClick={() => onCall(otherUserProfile?.user_id || '')}>
               <Phone className="w-5 h-5" />
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={() => setShowChatOptions(true)}>
