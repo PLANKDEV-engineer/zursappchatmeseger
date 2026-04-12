@@ -345,8 +345,8 @@ function AppContent() {
           chat={selectedChat}
           userId={user.id}
           onBack={handleBackFromChat}
-          onCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'voice')}
-          onVideoCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'video')}
+          onCall={(targetUserId) => handleCall(targetUserId, 'voice')}
+          onVideoCall={(targetUserId) => handleCall(targetUserId, 'video')}
           onInfo={() => {}}
           onChatWithUser={handleCreateChat}
         />
