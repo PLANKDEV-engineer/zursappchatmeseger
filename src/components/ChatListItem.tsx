@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { Check, CheckCheck } from 'lucide-react';
 import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import type { ChatWithDetails } from '@/hooks/useChats';
@@ -59,11 +59,9 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
   };
 
   return (
-    <motion.button
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+    <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover transition-all duration-300 group"
+      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover transition-colors duration-150 active:scale-[0.99]"
     >
       <Avatar
         src={chat.avatar_url || undefined}
@@ -97,6 +95,6 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           )}
         </div>
       </div>
-    </motion.button>
+    </button>
   );
 }
