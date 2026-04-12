@@ -983,8 +983,8 @@ export function ChatRoom({
           profile={otherUserProfile}
           isBlocked={isBlocked(otherUserProfile.user_id)}
           isOfficial={chat.is_official || false}
-          onCall={onCall}
-          onVideoCall={onVideoCall}
+          onCall={() => onCall(otherUserProfile.user_id)}
+          onVideoCall={() => onVideoCall(otherUserProfile.user_id)}
           onBlock={handleBlock}
           onReport={() => {
             setShowProfileView(false);
