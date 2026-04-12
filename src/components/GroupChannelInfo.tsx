@@ -57,6 +57,7 @@ export function GroupChannelInfo({
   userId,
   onChatWithUser,
 }: GroupChannelInfoProps) {
+  const { isAdmin: isAppAdmin } = useAuth();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserParticipant, setCurrentUserParticipant] = useState<Participant | null>(null);
@@ -253,7 +254,7 @@ export function GroupChannelInfo({
     }
   };
 
-  const isUserAdmin = currentUserParticipant?.is_admin || currentUserParticipant?.is_owner;
+  const isUserAdmin = currentUserParticipant?.is_admin || currentUserParticipant?.is_owner || isAppAdmin;
 
   return (
     <AnimatePresence>
