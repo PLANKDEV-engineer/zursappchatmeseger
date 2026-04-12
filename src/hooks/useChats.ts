@@ -35,54 +35,81 @@ export function useChats(userId: string | undefined) {
         .eq('is_archived', false);
       
       if (partError) throw partError;
+      if (!participations || participations.length === 0) {
+        setChats([]);
+        setLoading(false);
+        return;
+      }
+
+      const chatIds = participations.map(p => (p.chats as ChatType).id);
       
-      const chatList: ChatWithDetails[] = [];
-      
-      for (const part of participations || []) {
-        const chat = part.chats as ChatType;
-        
-        // Get last message
-        const { data: lastMsg } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('chat_id', chat.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        
-        // For private chats, get other participant's profile
-        let chatName = chat.name;
-        let chatAvatar = chat.avatar_url;
-        
-        if (chat.type === 'private') {
-          const { data: participants } = await supabase
-            .from('chat_participants')
-            .select('user_id')
-            .eq('chat_id', chat.id)
-            .neq('user_id', userId);
-          
-          if (participants && participants.length > 0) {
-            const { data: otherProfile } = await supabase
-              .from('profiles')
-              .select('name, avatar_url')
-              .eq('user_id', participants[0].user_id)
-              .single();
-            
-            if (otherProfile) {
-              chatName = otherProfile.name;
-              chatAvatar = otherProfile.avatar_url;
+      // Batch: get last message per chat using a single query
+      const { data: allMessages } = await supabase
+        .from('messages')
+        .select('*')
+        .in('chat_id', chatIds)
+        .order('created_at', { ascending: false });
+
+      // Build last message map (first occurrence per chat_id)
+      const lastMessageMap: Record<string, MessageType> = {};
+      for (const msg of allMessages || []) {
+        if (!lastMessageMap[msg.chat_id]) {
+          lastMessageMap[msg.chat_id] = msg;
+        }
+      }
+
+      // For private chats, batch fetch other participants
+      const privateChatIds = participations
+        .filter(p => (p.chats as ChatType).type === 'private')
+        .map(p => (p.chats as ChatType).id);
+
+      let otherProfilesMap: Record<string, { name: string; avatar_url: string | null }> = {};
+
+      if (privateChatIds.length > 0) {
+        const { data: otherParticipants } = await supabase
+          .from('chat_participants')
+          .select('chat_id, user_id')
+          .in('chat_id', privateChatIds)
+          .neq('user_id', userId);
+
+        if (otherParticipants && otherParticipants.length > 0) {
+          const otherUserIds = [...new Set(otherParticipants.map(p => p.user_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, name, avatar_url')
+            .in('user_id', otherUserIds);
+
+          const profileMap: Record<string, { name: string; avatar_url: string | null }> = {};
+          for (const p of profiles || []) {
+            profileMap[p.user_id] = { name: p.name, avatar_url: p.avatar_url };
+          }
+
+          for (const op of otherParticipants) {
+            if (profileMap[op.user_id]) {
+              otherProfilesMap[op.chat_id] = profileMap[op.user_id];
             }
           }
         }
-        
-        chatList.push({
+      }
+      
+      const chatList: ChatWithDetails[] = participations.map(part => {
+        const chat = part.chats as ChatType;
+        let chatName = chat.name;
+        let chatAvatar = chat.avatar_url;
+
+        if (chat.type === 'private' && otherProfilesMap[chat.id]) {
+          chatName = otherProfilesMap[chat.id].name;
+          chatAvatar = otherProfilesMap[chat.id].avatar_url;
+        }
+
+        return {
           ...chat,
           name: chatName,
           avatar_url: chatAvatar,
-          lastMessage: lastMsg,
+          lastMessage: lastMessageMap[chat.id] || null,
           unreadCount: part.unread_count || 0,
-        });
-      }
+        };
+      });
       
       // Sort by last message time
       chatList.sort((a, b) => {
