@@ -20,6 +20,29 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
   // Only show checkmarks for messages sent by current user
   const isOwnMessage = chat.lastMessage?.sender_id === user?.id;
 
+  const getMessagePreview = (msg: typeof chat.lastMessage) => {
+    if (!msg) return 'Mulai percakapan';
+    if (msg.is_deleted || msg.deleted_for_everyone) return '🚫 Pesan dihapus';
+    
+    switch (msg.type) {
+      case 'image': return '📷 Foto';
+      case 'video': return '🎥 Video';
+      case 'voice': return '🎤 Pesan suara';
+      case 'file': return '📄 Dokumen';
+      case 'poll': {
+        try {
+          const poll = JSON.parse(msg.content || '{}');
+          return `📊 Poll: ${poll.question || 'Poll'}`;
+        } catch { return '📊 Poll'; }
+      }
+      default: {
+        const content = msg.content || '';
+        if (content.startsWith('📍 Lokasi:')) return '📍 Lokasi';
+        return content || 'Mulai percakapan';
+      }
+    }
+  };
+
   const getStatusIcon = () => {
     if (!chat.lastMessage || !isOwnMessage) return null;
     
