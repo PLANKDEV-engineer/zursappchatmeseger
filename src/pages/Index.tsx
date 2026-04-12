@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { ChatProvider } from '@/context/ChatContext';
 import { AuthPage } from '@/pages/AuthPage';
 import { ChatDashboard } from '@/components/ChatDashboard';
