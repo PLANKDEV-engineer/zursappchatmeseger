@@ -1,6 +1,5 @@
 import React from 'react';
 import { Check, CheckCheck } from 'lucide-react';
-import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import type { ChatWithDetails } from '@/hooks/useChats';
 import { formatDistanceToNow } from 'date-fns';
