@@ -427,7 +427,18 @@ function AppContent() {
           callType={callInfo.type}
           callerName={callInfo.name}
           callerAvatar={callInfo.avatar}
+          isIncoming={!!webRTC.incomingCall}
+          onAnswer={handleAnswerCall}
+          onDecline={handleEndCall}
           onEndCall={handleEndCall}
+          localStream={webRTC.localStream}
+          remoteStream={webRTC.remoteStream}
+          callState={webRTC.callState}
+          callDuration={webRTC.callDuration}
+          isMuted={webRTC.isMuted}
+          isVideoOff={webRTC.isVideoOff}
+          onToggleMute={webRTC.toggleMute}
+          onToggleVideo={webRTC.toggleVideo}
         />
       )}
 
