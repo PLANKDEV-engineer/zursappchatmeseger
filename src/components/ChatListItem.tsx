@@ -63,7 +63,7 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {getStatusIcon()}
             <p className="text-sm text-muted-foreground truncate">
-              {chat.lastMessage?.content || 'Start a conversation'}
+              {getMessagePreview(chat.lastMessage)}
             </p>
           </div>
           
