@@ -46,8 +46,8 @@ interface ChatRoomProps {
   chat: ChatWithDetails;
   userId: string;
   onBack: () => void;
-  onCall: () => void;
-  onVideoCall: () => void;
+  onCall: (targetUserId: string) => void;
+  onVideoCall: (targetUserId: string) => void;
   onInfo: () => void;
   onChatWithUser?: (userId: string) => void;
 }
@@ -571,10 +571,10 @@ export function ChatRoom({
             <Button variant="ghost" size="icon-sm" onClick={() => setShowSearch(true)}>
               <Search className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={onVideoCall}>
+            <Button variant="ghost" size="icon-sm" onClick={() => onVideoCall(otherUserProfile?.user_id || '')}>
               <Video className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={onCall}>
+            <Button variant="ghost" size="icon-sm" onClick={() => onCall(otherUserProfile?.user_id || '')}>
               <Phone className="w-5 h-5" />
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={() => setShowChatOptions(true)}>
@@ -983,8 +983,8 @@ export function ChatRoom({
           profile={otherUserProfile}
           isBlocked={isBlocked(otherUserProfile.user_id)}
           isOfficial={chat.is_official || false}
-          onCall={onCall}
-          onVideoCall={onVideoCall}
+          onCall={() => onCall(otherUserProfile.user_id)}
+          onVideoCall={() => onVideoCall(otherUserProfile.user_id)}
           onBlock={handleBlock}
           onReport={() => {
             setShowProfileView(false);

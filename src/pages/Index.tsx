@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { ChatProvider } from '@/context/ChatContext';
 import { AuthPage } from '@/pages/AuthPage';
 import { ChatDashboard } from '@/components/ChatDashboard';
@@ -28,6 +29,7 @@ import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 import { useCalls } from '@/hooks/useCalls';
 import { usePresence } from '@/hooks/usePresence';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useWebRTC } from '@/hooks/useWebRTC';
 
 type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
 
@@ -50,6 +52,7 @@ function AppContent() {
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
   const { registerServiceWorker, isSubscribed: isPushSubscribed } = usePushNotifications(user?.id);
+  const webRTC = useWebRTC(user?.id);
   
   // Initialize presence tracking
   usePresence(user?.id);
@@ -109,6 +112,17 @@ function AppContent() {
   useEffect(() => {
     setPage([activeNavIndex, activeNavIndex > page ? 1 : -1]);
   }, [activeNavIndex, page]);
+
+  // Handle incoming calls
+  useEffect(() => {
+    if (webRTC.incomingCall) {
+      setCallInfo({
+        type: webRTC.incomingCall.callType,
+        name: webRTC.incomingCall.callerName,
+      });
+      setShowCallScreen(true);
+    }
+  }, [webRTC.incomingCall]);
 
   // Early returns AFTER all hooks
   if (loading) {
@@ -220,24 +234,43 @@ function AppContent() {
   };
 
   const handleCall = async (receiverId: string, type: 'voice' | 'video') => {
-    const { data } = await initiateCall(receiverId, type);
-    if (data) {
+    if (!receiverId) {
+      // For group chats, get the other user
+      return;
+    }
+    try {
+      // Get receiver profile
+      const { data: receiverProfile } = await supabase
+        .from('profiles')
+        .select('name, avatar_url')
+        .eq('user_id', receiverId)
+        .single();
+
       setCallInfo({
         type,
-        name: data.receiverProfile?.name || 'Unknown',
-        avatar: data.receiverProfile?.avatar_url || undefined,
+        name: receiverProfile?.name || 'Unknown',
+        avatar: receiverProfile?.avatar_url || undefined,
       });
       setShowCallScreen(true);
+      
+      await webRTC.startCall(receiverId, type);
+    } catch (err: any) {
+      console.error('Call failed:', err);
+      setShowCallScreen(false);
+      setCallInfo(null);
     }
   };
 
+  const handleAnswerCall = async () => {
+    await webRTC.answerCall();
+  };
+
   const handleEndCall = async () => {
-    if (activeCall) {
-      await endCall(activeCall.id);
-    }
+    webRTC.endCall();
     setShowCallScreen(false);
     setCallInfo(null);
   };
+
 
   // Slide variants for page transitions
   const slideVariants = {
@@ -312,8 +345,8 @@ function AppContent() {
           chat={selectedChat}
           userId={user.id}
           onBack={handleBackFromChat}
-          onCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'voice')}
-          onVideoCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'video')}
+          onCall={(targetUserId) => handleCall(targetUserId, 'voice')}
+          onVideoCall={(targetUserId) => handleCall(targetUserId, 'video')}
           onInfo={() => {}}
           onChatWithUser={handleCreateChat}
         />
@@ -394,7 +427,18 @@ function AppContent() {
           callType={callInfo.type}
           callerName={callInfo.name}
           callerAvatar={callInfo.avatar}
+          isIncoming={!!webRTC.incomingCall}
+          onAnswer={handleAnswerCall}
+          onDecline={handleEndCall}
           onEndCall={handleEndCall}
+          localStream={webRTC.localStream}
+          remoteStream={webRTC.remoteStream}
+          callState={webRTC.callState}
+          callDuration={webRTC.callDuration}
+          isMuted={webRTC.isMuted}
+          isVideoOff={webRTC.isVideoOff}
+          onToggleMute={webRTC.toggleMute}
+          onToggleVideo={webRTC.toggleVideo}
         />
       )}
 

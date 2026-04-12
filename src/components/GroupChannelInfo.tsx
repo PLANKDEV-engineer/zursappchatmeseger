@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -57,6 +58,7 @@ export function GroupChannelInfo({
   userId,
   onChatWithUser,
 }: GroupChannelInfoProps) {
+  const { isAdmin: isAppAdmin } = useAuth();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserParticipant, setCurrentUserParticipant] = useState<Participant | null>(null);
@@ -129,9 +131,17 @@ export function GroupChannelInfo({
   };
 
   const copyInviteLink = async () => {
-    // Use current origin for the invite link so it works in any environment
     const origin = window.location.origin;
     const link = chat.invite_link || `${origin}/join/${chat.id}`;
+    
+    // Save invite link to DB if not already saved
+    if (!chat.invite_link) {
+      await supabase
+        .from('chats')
+        .update({ invite_link: link })
+        .eq('id', chat.id);
+    }
+    
     await navigator.clipboard.writeText(link);
     setLinkCopied(true);
     toast.success('Link berhasil disalin!');
@@ -253,7 +263,7 @@ export function GroupChannelInfo({
     }
   };
 
-  const isUserAdmin = currentUserParticipant?.is_admin || currentUserParticipant?.is_owner;
+  const isUserAdmin = currentUserParticipant?.is_admin || currentUserParticipant?.is_owner || isAppAdmin;
 
   return (
     <AnimatePresence>
