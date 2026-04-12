@@ -45,22 +45,39 @@ export default function JoinPage() {
     if (!chatId) return;
     
     try {
-      // First try to find by exact ID
-      let { data: chat, error: chatError } = await supabase
+      // Try by exact ID first
+      let { data: chat } = await supabase
         .from('chats')
         .select('*')
         .eq('id', chatId)
+        .in('type', ['group', 'channel'])
         .maybeSingle();
 
-      // If not found by ID, try by invite_link
+      // If not found by ID, try matching invite_link field
       if (!chat) {
         const { data: chatByLink } = await supabase
           .from('chats')
           .select('*')
-          .ilike('invite_link', `%${chatId}%`)
+          .in('type', ['group', 'channel'])
+          .not('invite_link', 'is', null)
           .maybeSingle();
         
-        chat = chatByLink;
+        // Manual match since ilike may not work well with encoded URLs
+        if (!chatByLink) {
+          // Try broader search
+          const { data: allGroupChats } = await supabase
+            .from('chats')
+            .select('*')
+            .in('type', ['group', 'channel'])
+            .not('invite_link', 'is', null);
+          
+          chat = allGroupChats?.find(c => 
+            c.invite_link?.includes(chatId) || 
+            c.invite_link === chatId
+          ) || null;
+        } else {
+          chat = chatByLink.invite_link?.includes(chatId) ? chatByLink : null;
+        }
       }
 
       if (!chat) {

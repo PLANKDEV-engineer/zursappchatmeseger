@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import type { ChatWithDetails } from '@/hooks/useChats';
@@ -20,6 +19,29 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
   // Only show checkmarks for messages sent by current user
   const isOwnMessage = chat.lastMessage?.sender_id === user?.id;
 
+  const getMessagePreview = (msg: typeof chat.lastMessage) => {
+    if (!msg) return 'Mulai percakapan';
+    if (msg.is_deleted || msg.deleted_for_everyone) return '🚫 Pesan dihapus';
+    
+    switch (msg.type) {
+      case 'image': return '📷 Foto';
+      case 'video': return '🎥 Video';
+      case 'voice': return '🎤 Pesan suara';
+      case 'file': return '📄 Dokumen';
+      case 'poll': {
+        try {
+          const poll = JSON.parse(msg.content || '{}');
+          return `📊 Poll: ${poll.question || 'Poll'}`;
+        } catch { return '📊 Poll'; }
+      }
+      default: {
+        const content = msg.content || '';
+        if (content.startsWith('📍 Lokasi:')) return '📍 Lokasi';
+        return content || 'Mulai percakapan';
+      }
+    }
+  };
+
   const getStatusIcon = () => {
     if (!chat.lastMessage || !isOwnMessage) return null;
     
@@ -36,11 +58,9 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
   };
 
   return (
-    <motion.button
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+    <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover transition-all duration-300 group"
+      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover transition-colors duration-150 active:scale-[0.99]"
     >
       <Avatar
         src={chat.avatar_url || undefined}
@@ -63,7 +83,7 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {getStatusIcon()}
             <p className="text-sm text-muted-foreground truncate">
-              {chat.lastMessage?.content || 'Start a conversation'}
+              {getMessagePreview(chat.lastMessage)}
             </p>
           </div>
           
@@ -74,6 +94,6 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           )}
         </div>
       </div>
-    </motion.button>
+    </button>
   );
 }
