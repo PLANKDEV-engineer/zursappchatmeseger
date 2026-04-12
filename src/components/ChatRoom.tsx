@@ -46,8 +46,8 @@ interface ChatRoomProps {
   chat: ChatWithDetails;
   userId: string;
   onBack: () => void;
-  onCall: () => void;
-  onVideoCall: () => void;
+  onCall: (targetUserId: string) => void;
+  onVideoCall: (targetUserId: string) => void;
   onInfo: () => void;
   onChatWithUser?: (userId: string) => void;
 }
