@@ -607,9 +607,7 @@ export function ChatRoom({
                 isMe={isMe}
                 onSwipeReply={() => handleSwipeReply(message)}
               >
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                <div
                   className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
                 >
                   {!isMe && (
@@ -693,7 +691,7 @@ export function ChatRoom({
                       </div>
                     )}
                   </div>
-                </motion.div>
+                </div>
               </SwipeableMessage>
             );
           })
