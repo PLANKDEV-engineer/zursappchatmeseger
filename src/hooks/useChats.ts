@@ -129,22 +129,30 @@ export function useChats(userId: string | undefined) {
   useEffect(() => {
     fetchChats();
     
+    // Debounce realtime updates to avoid excessive re-fetching
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchChats(), 500);
+    };
+
     // Subscribe to realtime updates
     const channel = supabase
       .channel('chats-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },
-        () => fetchChats()
+        debouncedFetch
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'chat_participants' },
-        () => fetchChats()
+        debouncedFetch
       )
       .subscribe();
     
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [fetchChats]);
