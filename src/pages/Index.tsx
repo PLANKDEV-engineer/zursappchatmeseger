@@ -113,6 +113,17 @@ function AppContent() {
     setPage([activeNavIndex, activeNavIndex > page ? 1 : -1]);
   }, [activeNavIndex, page]);
 
+  // Handle incoming calls
+  useEffect(() => {
+    if (webRTC.incomingCall) {
+      setCallInfo({
+        type: webRTC.incomingCall.callType,
+        name: webRTC.incomingCall.callerName,
+      });
+      setShowCallScreen(true);
+    }
+  }, [webRTC.incomingCall]);
+
   // Early returns AFTER all hooks
   if (loading) {
     return <LoadingScreen />;
