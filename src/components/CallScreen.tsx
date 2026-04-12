@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Phone, 
@@ -8,10 +8,8 @@ import {
   Mic, 
   MicOff, 
   Volume2,
-  X 
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
-import { Button } from '@/components/ui/button';
 
 interface CallScreenProps {
   isOpen: boolean;
@@ -23,6 +21,15 @@ interface CallScreenProps {
   onAnswer?: () => void;
   onDecline?: () => void;
   onEndCall: () => void;
+  // WebRTC streams
+  localStream?: MediaStream | null;
+  remoteStream?: MediaStream | null;
+  callState?: 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
+  callDuration?: number;
+  isMuted?: boolean;
+  isVideoOff?: boolean;
+  onToggleMute?: () => void;
+  onToggleVideo?: () => void;
 }
 
 export function CallScreen({
@@ -35,38 +42,42 @@ export function CallScreen({
   onAnswer,
   onDecline,
   onEndCall,
+  localStream,
+  remoteStream,
+  callState: externalCallState,
+  callDuration: externalDuration,
+  isMuted: externalMuted,
+  isVideoOff: externalVideoOff,
+  onToggleMute,
+  onToggleVideo,
 }: CallScreenProps) {
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
-  const [callDuration, setCallDuration] = useState(0);
-  const [callStatus, setCallStatus] = useState<'ringing' | 'connected' | 'ended'>(
-    isIncoming ? 'ringing' : 'ringing'
-  );
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    
-    if (callStatus === 'connected') {
-      interval = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [callStatus]);
+  const callStatus = externalCallState || (isIncoming ? 'ringing' : 'calling');
+  const duration = externalDuration || 0;
+  const muted = externalMuted || false;
+  const videoOff = externalVideoOff || false;
 
+  // Attach local stream to video element
   useEffect(() => {
-    // Simulate call connection after 3 seconds for outgoing calls
-    if (!isIncoming && callStatus === 'ringing') {
-      const timeout = setTimeout(() => {
-        setCallStatus('connected');
-      }, 3000);
-      return () => clearTimeout(timeout);
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
     }
-  }, [isIncoming, callStatus]);
+  }, [localStream]);
+
+  // Attach remote stream to video/audio element
+  useEffect(() => {
+    if (remoteStream) {
+      if (callType === 'video' && remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
+      }
+    }
+  }, [remoteStream, callType]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -75,12 +86,10 @@ export function CallScreen({
   };
 
   const handleAnswer = () => {
-    setCallStatus('connected');
     onAnswer?.();
   };
 
   const handleEndCall = () => {
-    setCallStatus('ended');
     onEndCall();
     onClose();
   };
@@ -94,6 +103,9 @@ export function CallScreen({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 bg-gradient-to-b from-background via-background to-primary/20"
         >
+          {/* Hidden audio element for voice calls */}
+          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
           <div className="flex flex-col items-center justify-between h-full py-12 px-6">
             {/* Top Section */}
             <div className="flex flex-col items-center">
@@ -109,8 +121,7 @@ export function CallScreen({
                     size="xl"
                     showStatus={false}
                   />
-                  {/* Ripple effect for ringing */}
-                  {callStatus === 'ringing' && (
+                  {callStatus === 'ringing' || callStatus === 'calling' ? (
                     <>
                       <motion.div
                         className="absolute inset-0 rounded-full border-2 border-primary"
@@ -123,7 +134,7 @@ export function CallScreen({
                         transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }}
                       />
                     </>
-                  )}
+                  ) : null}
                 </div>
               </motion.div>
 
@@ -132,8 +143,9 @@ export function CallScreen({
               </h2>
               
               <p className="text-muted-foreground mt-2">
-                {callStatus === 'ringing' && (isIncoming ? 'Panggilan masuk...' : 'Memanggil...')}
-                {callStatus === 'connected' && formatDuration(callDuration)}
+                {callStatus === 'calling' && 'Memanggil...'}
+                {callStatus === 'ringing' && (isIncoming ? 'Panggilan masuk...' : 'Berdering...')}
+                {callStatus === 'connected' && formatDuration(duration)}
                 {callStatus === 'ended' && 'Panggilan berakhir'}
               </p>
 
@@ -149,14 +161,40 @@ export function CallScreen({
               </div>
             </div>
 
-            {/* Video Preview (for video calls) */}
+            {/* Video Preview */}
             {callType === 'video' && callStatus === 'connected' && (
-              <div className="flex-1 w-full max-w-md my-8">
-                <div className="w-full aspect-video rounded-2xl bg-card/50 flex items-center justify-center">
-                  {isVideoOff ? (
-                    <VideoOff className="w-12 h-12 text-muted-foreground" />
+              <div className="flex-1 w-full max-w-md my-8 relative">
+                {/* Remote video (large) */}
+                <div className="w-full aspect-video rounded-2xl bg-card/50 overflow-hidden">
+                  {remoteStream ? (
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <p className="text-muted-foreground">Video preview</p>
+                    <div className="w-full h-full flex items-center justify-center">
+                      <p className="text-muted-foreground">Menunggu video...</p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Local video (small, picture-in-picture) */}
+                <div className="absolute top-3 right-3 w-24 aspect-video rounded-xl bg-card overflow-hidden border-2 border-border shadow-lg">
+                  {localStream && !videoOff ? (
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover mirror"
+                      style={{ transform: 'scaleX(-1)' }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <VideoOff className="w-6 h-6 text-muted-foreground" />
+                    </div>
                   )}
                 </div>
               </div>
@@ -167,7 +205,6 @@ export function CallScreen({
               {callStatus === 'ringing' && isIncoming ? (
                 <div className="flex justify-center gap-8">
                   <motion.button
-                    whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={() => {
                       onDecline?.();
@@ -175,29 +212,27 @@ export function CallScreen({
                     }}
                     className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-lg"
                   >
-                    <PhoneOff className="w-7 h-7 text-white" />
+                    <PhoneOff className="w-7 h-7 text-destructive-foreground" />
                   </motion.button>
                   <motion.button
-                    whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={handleAnswer}
-                    className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg"
+                    className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg"
                   >
-                    <Phone className="w-7 h-7 text-white" />
+                    <Phone className="w-7 h-7 text-primary-foreground" />
                   </motion.button>
                 </div>
               ) : (
                 <>
-                  {/* Control buttons during call */}
                   {callStatus === 'connected' && (
                     <div className="flex justify-center gap-4 mb-8">
                       <button
-                        onClick={() => setIsMuted(!isMuted)}
+                        onClick={onToggleMute || (() => {})}
                         className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
-                          isMuted ? 'bg-destructive/20' : 'bg-card'
+                          muted ? 'bg-destructive/20' : 'bg-card'
                         }`}
                       >
-                        {isMuted ? (
+                        {muted ? (
                           <MicOff className="w-6 h-6 text-destructive" />
                         ) : (
                           <Mic className="w-6 h-6 text-foreground" />
@@ -206,12 +241,12 @@ export function CallScreen({
 
                       {callType === 'video' && (
                         <button
-                          onClick={() => setIsVideoOff(!isVideoOff)}
+                          onClick={onToggleVideo || (() => {})}
                           className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
-                            isVideoOff ? 'bg-destructive/20' : 'bg-card'
+                            videoOff ? 'bg-destructive/20' : 'bg-card'
                           }`}
                         >
-                          {isVideoOff ? (
+                          {videoOff ? (
                             <VideoOff className="w-6 h-6 text-destructive" />
                           ) : (
                             <Video className="w-6 h-6 text-foreground" />
@@ -220,29 +255,20 @@ export function CallScreen({
                       )}
 
                       <button
-                        onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
-                          isSpeakerOn ? 'bg-primary/20' : 'bg-card'
-                        }`}
+                        className="w-14 h-14 rounded-full flex items-center justify-center bg-card"
                       >
-                        <Volume2
-                          className={`w-6 h-6 ${
-                            isSpeakerOn ? 'text-primary' : 'text-foreground'
-                          }`}
-                        />
+                        <Volume2 className="w-6 h-6 text-foreground" />
                       </button>
                     </div>
                   )}
 
-                  {/* End call button */}
                   <div className="flex justify-center">
                     <motion.button
-                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={handleEndCall}
                       className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-lg"
                     >
-                      <PhoneOff className="w-7 h-7 text-white" />
+                      <PhoneOff className="w-7 h-7 text-destructive-foreground" />
                     </motion.button>
                   </div>
                 </>
