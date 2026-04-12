@@ -271,16 +271,6 @@ function AppContent() {
     setCallInfo(null);
   };
 
-  // Handle incoming calls
-  useEffect(() => {
-    if (webRTC.incomingCall) {
-      setCallInfo({
-        type: webRTC.incomingCall.callType,
-        name: webRTC.incomingCall.callerName,
-      });
-      setShowCallScreen(true);
-    }
-  }, [webRTC.incomingCall]);
 
   // Slide variants for page transitions
   const slideVariants = {
