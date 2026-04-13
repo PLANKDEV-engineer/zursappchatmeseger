@@ -212,6 +212,37 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
       }
     }
 
+    // Send push notification to other participants
+    if (data && !error && otherParticipantIds.length > 0) {
+      try {
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('user_id', userId)
+          .single();
+
+        const title = senderProfile?.name || 'Pesan baru';
+        let body = content;
+        if (type === 'image') body = '📷 Foto';
+        else if (type === 'video') body = '🎥 Video';
+        else if (type === 'voice') body = '🎤 Pesan suara';
+        else if (type === 'file') body = '📄 Dokumen';
+        else if (type === 'poll') body = '📊 Poll';
+
+        await supabase.functions.invoke('send-push-notification', {
+          body: {
+            userIds: otherParticipantIds,
+            title,
+            body,
+            data: { chatId, messageId: data.id },
+            tag: `chat-${chatId}`,
+          },
+        });
+      } catch (e) {
+        console.error('[Push] Failed to send notification:', e);
+      }
+    }
+
     return { data, error };
   };
 

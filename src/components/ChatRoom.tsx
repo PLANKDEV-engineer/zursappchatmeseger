@@ -39,6 +39,7 @@ import { GroupChannelInfo } from '@/components/GroupChannelInfo';
 import { SearchMessagesSheet } from '@/components/SearchMessagesSheet';
 import { ReportMessageModal } from '@/components/ReportMessageModal';
 import { LocationShare } from '@/components/LocationShare';
+import { MentionPicker } from '@/components/MentionPicker';
 import { toast } from 'sonner';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
@@ -85,6 +86,8 @@ export function ChatRoom({
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const [chatWallpaper, setChatWallpaper] = useState<string | null>(null);
   const [showLocationShare, setShowLocationShare] = useState(false);
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -97,8 +100,31 @@ export function ChatRoom({
   }, [messages]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const val = e.target.value;
+    setInputValue(val);
     setTyping(true);
+
+    // Check for @ mention in group chats
+    if ((chat.type === 'group') && val.includes('@')) {
+      const lastAtIndex = val.lastIndexOf('@');
+      const afterAt = val.substring(lastAtIndex + 1);
+      // Only show if @ is at end or followed by text without space
+      if (!afterAt.includes(' ')) {
+        setMentionFilter(afterAt);
+        setShowMentionPicker(true);
+      } else {
+        setShowMentionPicker(false);
+      }
+    } else {
+      setShowMentionPicker(false);
+    }
+  };
+
+  const handleMentionSelect = (member: { user_id: string; name: string }) => {
+    const lastAtIndex = inputValue.lastIndexOf('@');
+    const newValue = inputValue.substring(0, lastAtIndex) + `@${member.name} `;
+    setInputValue(newValue);
+    setShowMentionPicker(false);
   };
 
   const handleSend = async () => {
@@ -736,6 +762,14 @@ export function ChatRoom({
             </Button>
 
             <div className="flex-1 relative">
+              {/* @ Mention Picker */}
+              <MentionPicker
+                isOpen={showMentionPicker}
+                chatId={chat.id}
+                filter={mentionFilter}
+                onSelect={handleMentionSelect}
+                onClose={() => setShowMentionPicker(false)}
+              />
               <input
                 type="text"
                 placeholder="Ketik pesan..."
