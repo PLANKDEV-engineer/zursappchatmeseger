@@ -20,6 +20,7 @@ interface UseWebRTCReturn {
   endCall: () => void;
   toggleMute: () => void;
   toggleVideo: () => void;
+  switchCamera: () => void;
   isMuted: boolean;
   isVideoOff: boolean;
   callDuration: number;
@@ -41,6 +42,8 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
   const callTypeRef = useRef<'voice' | 'video'>('voice');
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const facingModeRef = useRef<'user' | 'environment'>('user');
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   // Duration timer
   useEffect(() => {
@@ -69,16 +72,12 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
         const { callerId, callerName, callType, offer } = payload.payload;
         callTypeRef.current = callType;
         targetUserIdRef.current = callerId;
-        
-        // Store the offer for when user answers
         pendingCandidatesRef.current = [];
-        
-        // Create peer connection early to collect ICE candidates
+
         const pc = createPeerConnection();
         peerConnectionRef.current = pc;
-        
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        
+
         setIncomingCall({ callerId, callerName, callType });
         setCallState('ringing');
       })
@@ -98,13 +97,8 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
         const pc = peerConnectionRef.current;
         if (pc) {
           await pc.setRemoteDescription(new RTCSessionDescription(payload.payload.answer));
-          // Add pending candidates
           for (const candidate of pendingCandidatesRef.current) {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (e) {
-              console.error('Error adding pending ICE candidate:', e);
-            }
+            try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
           }
           pendingCandidatesRef.current = [];
           setCallState('connected');
@@ -118,10 +112,7 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
       .subscribe();
 
     channelRef.current = channel;
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
   const createPeerConnection = useCallback(() => {
@@ -152,11 +143,12 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
   }, []);
 
   const getMediaStream = useCallback(async (callType: 'voice' | 'video') => {
+    const constraints: MediaStreamConstraints = {
+      audio: true,
+      video: callType === 'video' ? { facingMode: facingModeRef.current, width: { ideal: 1280 }, height: { ideal: 720 } } : false,
+    };
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: callType === 'video',
-      });
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       return stream;
     } catch (err) {
       console.error('Error accessing media devices:', err);
@@ -176,6 +168,7 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
 
       const stream = await getMediaStream(callType);
       setLocalStream(stream);
+      localStreamRef.current = stream;
 
       const pc = createPeerConnection();
       peerConnectionRef.current = pc;
@@ -185,14 +178,12 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Get caller profile name
       const { data: profile } = await supabase
         .from('profiles')
         .select('name')
         .eq('user_id', userId)
         .single();
 
-      // Send offer to target user
       await supabase.channel(`calls:${targetUserId}`).send({
         type: 'broadcast',
         event: 'incoming-call',
@@ -204,15 +195,13 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
         },
       });
 
-      // Record call in history
       await supabase.from('call_history').insert({
         caller_id: userId,
         receiver_id: targetUserId,
         type: callType,
         status: 'ringing',
       });
-
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error starting call:', err);
       cleanup();
       setCallState('idle');
@@ -226,6 +215,7 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
     try {
       const stream = await getMediaStream(callTypeRef.current);
       setLocalStream(stream);
+      localStreamRef.current = stream;
 
       const pc = peerConnectionRef.current;
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
@@ -233,20 +223,14 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      // Send answer to caller
       await supabase.channel(`calls:${incomingCall.callerId}`).send({
         type: 'broadcast',
         event: 'call-answer',
         payload: { answer: pc.localDescription?.toJSON() },
       });
 
-      // Add pending candidates
       for (const candidate of pendingCandidatesRef.current) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.error('Error adding pending ICE candidate:', e);
-        }
+        try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
       }
       pendingCandidatesRef.current = [];
 
@@ -260,21 +244,19 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
   }, [incomingCall, getMediaStream]);
 
   const cleanup = useCallback(() => {
-    localStream?.getTracks().forEach(track => track.stop());
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+    localStreamRef.current = null;
     setLocalStream(null);
     setRemoteStream(null);
-
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
-
     setIncomingCall(null);
     setCallDuration(0);
     setIsMuted(false);
     setIsVideoOff(false);
-  }, [localStream]);
+  }, []);
 
   const endCall = useCallback(() => {
-    // Notify the other party
     if (targetUserIdRef.current) {
       supabase.channel(`calls:${targetUserIdRef.current}`).send({
         type: 'broadcast',
@@ -282,29 +264,62 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
         payload: {},
       });
     }
-
     cleanup();
     setCallState('ended');
     setTimeout(() => setCallState('idle'), 1500);
   }, [cleanup]);
 
   const toggleMute = useCallback(() => {
-    if (localStream) {
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getAudioTracks().forEach(track => { track.enabled = !track.enabled; });
       setIsMuted(prev => !prev);
     }
-  }, [localStream]);
+  }, []);
 
   const toggleVideo = useCallback(() => {
-    if (localStream) {
-      localStream.getVideoTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getVideoTracks().forEach(track => { track.enabled = !track.enabled; });
       setIsVideoOff(prev => !prev);
     }
-  }, [localStream]);
+  }, []);
+
+  const switchCamera = useCallback(async () => {
+    if (callTypeRef.current !== 'video' || !peerConnectionRef.current) return;
+    
+    facingModeRef.current = facingModeRef.current === 'user' ? 'environment' : 'user';
+    
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingModeRef.current, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const pc = peerConnectionRef.current;
+      const senders = pc.getSenders();
+      const videoSender = senders.find(s => s.track?.kind === 'video');
+      
+      if (videoSender) {
+        await videoSender.replaceTrack(newVideoTrack);
+      }
+      
+      // Replace track in local stream
+      const currentStream = localStreamRef.current;
+      if (currentStream) {
+        const oldTrack = currentStream.getVideoTracks()[0];
+        if (oldTrack) {
+          currentStream.removeTrack(oldTrack);
+          oldTrack.stop();
+        }
+        currentStream.addTrack(newVideoTrack);
+        setLocalStream(new MediaStream(currentStream.getTracks()));
+      }
+    } catch (err) {
+      console.error('Error switching camera:', err);
+    }
+  }, []);
 
   return {
     callState,
@@ -315,6 +330,7 @@ export function useWebRTC(userId: string | undefined): UseWebRTCReturn {
     endCall,
     toggleMute,
     toggleVideo,
+    switchCamera,
     isMuted,
     isVideoOff,
     callDuration,
