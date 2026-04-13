@@ -439,6 +439,7 @@ function AppContent() {
           isVideoOff={webRTC.isVideoOff}
           onToggleMute={webRTC.toggleMute}
           onToggleVideo={webRTC.toggleVideo}
+          onSwitchCamera={webRTC.switchCamera}
         />
       )}
 

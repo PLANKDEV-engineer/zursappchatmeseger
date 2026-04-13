@@ -762,6 +762,14 @@ export function ChatRoom({
             </Button>
 
             <div className="flex-1 relative">
+              {/* @ Mention Picker */}
+              <MentionPicker
+                isOpen={showMentionPicker}
+                chatId={chat.id}
+                filter={mentionFilter}
+                onSelect={handleMentionSelect}
+                onClose={() => setShowMentionPicker(false)}
+              />
               <input
                 type="text"
                 placeholder="Ketik pesan..."
