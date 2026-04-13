@@ -59,11 +59,21 @@ export function CameraPage({
 
   const requestPermissions = async () => {
     try {
-      // Request camera and microphone permissions
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+      // Stop existing stream first
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: facingMode },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
         audio: true,
-      });
+      };
+      
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       
       setStream(mediaStream);
       setHasPermissions(true);
@@ -80,8 +90,11 @@ export function CameraPage({
 
   const startCamera = async () => {
     try {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: true,
       });
       setStream(mediaStream);
