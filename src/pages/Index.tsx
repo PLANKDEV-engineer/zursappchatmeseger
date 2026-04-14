@@ -481,6 +481,35 @@ function AppContent() {
         isOpen={showNotificationPrompt}
         onClose={() => setShowNotificationPrompt(false)}
       />
+
+      {/* Invite to Call Modal */}
+      <InviteToCallModal
+        isOpen={showInviteToCall}
+        onClose={() => setShowInviteToCall(false)}
+        userId={user.id}
+        onInvite={async (targetUserId) => {
+          // Send push notification to invite user to call
+          try {
+            const { data: senderProfile } = await supabase
+              .from('profiles')
+              .select('name')
+              .eq('user_id', user.id)
+              .single();
+            
+            await supabase.functions.invoke('send-push-notification', {
+              body: {
+                userIds: [targetUserId],
+                title: '📞 Undangan Panggilan',
+                body: `${senderProfile?.name || 'Seseorang'} mengundang Anda ke panggilan`,
+                data: { type: 'call_invite', callerId: user.id },
+                tag: 'call-invite',
+              },
+            });
+          } catch (e) {
+            console.error('Failed to send call invite:', e);
+          }
+        }}
+      />
     </div>
   );
 }
