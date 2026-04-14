@@ -9,6 +9,7 @@ import {
   MicOff, 
   Volume2,
   SwitchCamera,
+  UserPlus,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 
@@ -31,6 +32,7 @@ interface CallScreenProps {
   onToggleMute?: () => void;
   onToggleVideo?: () => void;
   onSwitchCamera?: () => void;
+  onInviteToCall?: () => void;
 }
 
 export function CallScreen({
@@ -52,6 +54,7 @@ export function CallScreen({
   onToggleMute,
   onToggleVideo,
   onSwitchCamera,
+  onInviteToCall,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -202,6 +205,14 @@ export function CallScreen({
                   <button className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10">
                     <Volume2 className="w-5 h-5 text-white" />
                   </button>
+                  {onInviteToCall && (
+                    <button
+                      onClick={onInviteToCall}
+                      className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10"
+                    >
+                      <UserPlus className="w-5 h-5 text-white" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex justify-center">
                   <button
@@ -278,6 +289,14 @@ export function CallScreen({
                     <button className="w-14 h-14 rounded-full flex items-center justify-center bg-card">
                       <Volume2 className="w-6 h-6 text-foreground" />
                     </button>
+                    {onInviteToCall && (
+                      <button
+                        onClick={onInviteToCall}
+                        className="w-14 h-14 rounded-full flex items-center justify-center bg-card"
+                      >
+                        <UserPlus className="w-6 h-6 text-foreground" />
+                      </button>
+                    )}
                   </div>
                 )}
                 <div className="flex justify-center">

@@ -221,7 +221,41 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
           .eq('user_id', userId)
           .single();
 
-        const title = senderProfile?.name || 'Pesan baru';
+        const senderName = senderProfile?.name || 'Pesan baru';
+
+        // Check for @mentions and send targeted notifications
+        const mentionRegex = /@(\S+)/g;
+        let match;
+        const mentionedNames: string[] = [];
+        while ((match = mentionRegex.exec(content)) !== null) {
+          mentionedNames.push(match[1]);
+        }
+
+        if (mentionedNames.length > 0) {
+          // Find user IDs of mentioned users
+          const { data: mentionedProfiles } = await supabase
+            .from('profiles')
+            .select('user_id, name')
+            .in('name', mentionedNames);
+
+          if (mentionedProfiles && mentionedProfiles.length > 0) {
+            const mentionedUserIds = mentionedProfiles.map(p => p.user_id).filter(id => id !== userId);
+            if (mentionedUserIds.length > 0) {
+              await supabase.functions.invoke('send-push-notification', {
+                body: {
+                  userIds: mentionedUserIds,
+                  title: `@ ${senderName} menyebutmu`,
+                  body: content.length > 80 ? content.substring(0, 80) + '...' : content,
+                  data: { chatId, messageId: data.id, type: 'mention' },
+                  tag: `mention-${chatId}`,
+                },
+              });
+            }
+          }
+        }
+
+        // General notification to all other participants
+        const title = senderName;
         let body = content;
         if (type === 'image') body = '📷 Foto';
         else if (type === 'video') body = '🎥 Video';
@@ -229,15 +263,23 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
         else if (type === 'file') body = '📄 Dokumen';
         else if (type === 'poll') body = '📊 Poll';
 
-        await supabase.functions.invoke('send-push-notification', {
-          body: {
-            userIds: otherParticipantIds,
-            title,
-            body,
-            data: { chatId, messageId: data.id },
-            tag: `chat-${chatId}`,
-          },
-        });
+        // Exclude mentioned users from general notification to avoid duplicate
+        const mentionedIds = mentionedNames.length > 0
+          ? (await supabase.from('profiles').select('user_id').in('name', mentionedNames)).data?.map(p => p.user_id) || []
+          : [];
+        const generalRecipients = otherParticipantIds.filter(id => !mentionedIds.includes(id));
+
+        if (generalRecipients.length > 0) {
+          await supabase.functions.invoke('send-push-notification', {
+            body: {
+              userIds: generalRecipients,
+              title,
+              body,
+              data: { chatId, messageId: data.id },
+              tag: `chat-${chatId}`,
+            },
+          });
+        }
       } catch (e) {
         console.error('[Push] Failed to send notification:', e);
       }

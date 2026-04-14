@@ -316,7 +316,7 @@ export default function JoinPage() {
             <p className="text-center text-muted-foreground text-sm mb-4">
               Login untuk {chatInfo.type === 'channel' ? 'mengikuti saluran' : 'bergabung ke grup'}
             </p>
-            <Button onClick={() => navigate('/')} className="w-full">
+            <Button onClick={() => navigate(`/?redirect=/join/${chatId}`)} className="w-full">
               Login / Daftar
             </Button>
           </div>
