@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatProvider } from '@/context/ChatContext';
