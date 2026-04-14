@@ -455,6 +455,7 @@ function AppContent() {
           onToggleMute={webRTC.toggleMute}
           onToggleVideo={webRTC.toggleVideo}
           onSwitchCamera={webRTC.switchCamera}
+          onInviteToCall={() => setShowInviteToCall(true)}
         />
       )}
 
