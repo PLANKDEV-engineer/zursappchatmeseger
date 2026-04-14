@@ -264,6 +264,7 @@ function AppContent() {
         type,
         name: receiverProfile?.name || 'Unknown',
         avatar: receiverProfile?.avatar_url || undefined,
+        targetUserId: receiverId,
       });
       setShowCallScreen(true);
       
