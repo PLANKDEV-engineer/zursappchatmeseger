@@ -90,8 +90,9 @@ function AppContent() {
   const [showCameraPage, setShowCameraPage] = useState(false);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [settingsInitialView, setSettingsInitialView] = useState<'main' | 'archived'>('main');
-  const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
+  const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string; targetUserId?: string } | null>(null);
   const [[page, direction], setPage] = useState([0, 0]);
+  const [showInviteToCall, setShowInviteToCall] = useState(false);
 
   // Show notification prompt after first login if not subscribed
   useEffect(() => {
