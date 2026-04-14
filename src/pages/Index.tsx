@@ -49,6 +49,8 @@ function LoadingScreen() {
 function AppContent() {
   const { user, profile, loading, isAdmin, isBlocked, blockInfo } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { chats, fetchChats, createPrivateChat, createGroupChat } = useChats(user?.id);
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
@@ -57,6 +59,16 @@ function AppContent() {
   
   // Initialize presence tracking
   usePresence(user?.id);
+
+  // Handle redirect after login
+  useEffect(() => {
+    if (user && !loading) {
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        navigate(redirect, { replace: true });
+      }
+    }
+  }, [user, loading, searchParams, navigate]);
 
   // Register service worker on mount
   useEffect(() => {
