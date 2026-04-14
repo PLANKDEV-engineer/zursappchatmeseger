@@ -22,6 +22,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { BlockedScreen } from '@/components/BlockedScreen';
 import { CameraPage } from '@/components/CameraPage';
 import { NotificationPrompt } from '@/components/NotificationPrompt';
+import { InviteToCallModal } from '@/components/InviteToCallModal';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
