@@ -205,6 +205,14 @@ export function CallScreen({
                   <button className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10">
                     <Volume2 className="w-5 h-5 text-white" />
                   </button>
+                  {onInviteToCall && (
+                    <button
+                      onClick={onInviteToCall}
+                      className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10"
+                    >
+                      <UserPlus className="w-5 h-5 text-white" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex justify-center">
                   <button
