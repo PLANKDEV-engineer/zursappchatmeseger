@@ -32,6 +32,7 @@ interface CallScreenProps {
   onToggleMute?: () => void;
   onToggleVideo?: () => void;
   onSwitchCamera?: () => void;
+  onInviteToCall?: () => void;
 }
 
 export function CallScreen({
@@ -53,6 +54,7 @@ export function CallScreen({
   onToggleMute,
   onToggleVideo,
   onSwitchCamera,
+  onInviteToCall,
 }: CallScreenProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
