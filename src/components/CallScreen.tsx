@@ -9,6 +9,7 @@ import {
   MicOff, 
   Volume2,
   SwitchCamera,
+  UserPlus,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 
