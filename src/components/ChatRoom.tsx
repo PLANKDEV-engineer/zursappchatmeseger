@@ -703,7 +703,7 @@ export function ChatRoom({
                       </div>
                     )}
                   </div>
-                </motion.div>
+                </div>
               </SwipeableMessage>
             );
           })

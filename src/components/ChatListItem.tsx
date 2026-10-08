@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import type { ChatWithDetails } from '@/hooks/useChats';
@@ -36,11 +36,9 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
   };
 
   return (
-    <motion.button
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+    <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover transition-all duration-300 group"
+      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover active:bg-card-hover transition-colors duration-150 group touch-manipulation"
     >
       <Avatar
         src={chat.avatar_url || undefined}
@@ -54,6 +52,7 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           <h3 className="font-display font-semibold text-foreground truncate">
             {chat.name || 'Unknown'}
           </h3>
+          {chat.is_official && <VerifiedBadge />}
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             {lastMessageTime}
           </span>
@@ -63,7 +62,7 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {getStatusIcon()}
             <p className="text-sm text-muted-foreground truncate">
-              {chat.lastMessage?.content || 'Start a conversation'}
+              {chat.lastMessage?.content?.replace(/^\[system\] /, '') || 'Mulai percakapan'}
             </p>
           </div>
           
@@ -74,6 +73,6 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           )}
         </div>
       </div>
-    </motion.button>
+    </button>
   );
 }
