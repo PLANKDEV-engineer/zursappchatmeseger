@@ -45,7 +45,7 @@ export function CallScreen({
   );
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setTimeout>;
     
     if (callStatus === 'connected') {
       interval = setInterval(() => {
