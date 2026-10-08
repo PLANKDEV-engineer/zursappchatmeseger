@@ -12,6 +12,7 @@ interface UserWithDetails {
   phone: string | null;
   avatar_url: string | null;
   is_online: boolean;
+  last_seen?: string | null;
   created_at: string;
   role: 'admin' | 'moderator' | 'user';
   isBlocked: boolean;
@@ -70,6 +71,7 @@ export function useAdmin(userId: string | undefined, isAdmin: boolean) {
           phone: profile.phone,
           avatar_url: profile.avatar_url,
           is_online: profile.is_online || false,
+          last_seen: profile.last_seen,
           created_at: profile.created_at,
           role: roleData?.role || 'user',
           isBlocked: !!blockData,

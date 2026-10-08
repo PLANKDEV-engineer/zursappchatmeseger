@@ -151,8 +151,8 @@ export default function JoinPage() {
           .from('messages')
           .insert({
             chat_id: chatInfo.id,
-            sender_id: user.id,
-            content: `${profile.name} telah bergabung ke grup menggunakan link tautan`,
+            sender_id: null,
+            content: `[system] ${profile.name} bergabung ke grup menggunakan tautan undangan`,
             type: 'text',
           });
       }
