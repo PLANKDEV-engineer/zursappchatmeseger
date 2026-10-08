@@ -603,15 +603,23 @@ export function ChatRoom({
           messages.map((message) => {
             const isMe = message.sender_id === userId;
 
+            if (!message.sender_id || message.content?.startsWith('[system] ')) {
+              return (
+                <div key={message.id} className="flex justify-center my-2">
+                  <span className="px-3 py-1 rounded-full bg-muted/70 text-muted-foreground text-xs text-center max-w-[85%]">
+                    {(message.content || '').replace(/^\[system\] /, '')}
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <SwipeableMessage
                 key={message.id}
                 isMe={isMe}
                 onSwipeReply={() => handleSwipeReply(message)}
               >
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                <div
                   className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
                 >
                   {!isMe && (
