@@ -1,4 +1,5 @@
 import React from 'react';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Check, CheckCheck } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import type { ChatWithDetails } from '@/hooks/useChats';
@@ -19,29 +20,6 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
   // Only show checkmarks for messages sent by current user
   const isOwnMessage = chat.lastMessage?.sender_id === user?.id;
 
-  const getMessagePreview = (msg: typeof chat.lastMessage) => {
-    if (!msg) return 'Mulai percakapan';
-    if (msg.is_deleted || msg.deleted_for_everyone) return '🚫 Pesan dihapus';
-    
-    switch (msg.type) {
-      case 'image': return '📷 Foto';
-      case 'video': return '🎥 Video';
-      case 'voice': return '🎤 Pesan suara';
-      case 'file': return '📄 Dokumen';
-      case 'poll': {
-        try {
-          const poll = JSON.parse(msg.content || '{}');
-          return `📊 Poll: ${poll.question || 'Poll'}`;
-        } catch { return '📊 Poll'; }
-      }
-      default: {
-        const content = msg.content || '';
-        if (content.startsWith('📍 Lokasi:')) return '📍 Lokasi';
-        return content || 'Mulai percakapan';
-      }
-    }
-  };
-
   const getStatusIcon = () => {
     if (!chat.lastMessage || !isOwnMessage) return null;
     
@@ -60,7 +38,7 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover transition-colors duration-150 active:scale-[0.99]"
+      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-card-hover active:bg-card-hover transition-colors duration-150 group touch-manipulation"
     >
       <Avatar
         src={chat.avatar_url || undefined}
@@ -74,6 +52,7 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           <h3 className="font-display font-semibold text-foreground truncate">
             {chat.name || 'Unknown'}
           </h3>
+          {chat.is_official && <VerifiedBadge />}
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             {lastMessageTime}
           </span>
@@ -83,7 +62,7 @@ export function ChatListItem({ chat, onClick }: ChatListItemProps) {
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {getStatusIcon()}
             <p className="text-sm text-muted-foreground truncate">
-              {getMessagePreview(chat.lastMessage)}
+              {chat.lastMessage?.content?.replace(/^\[system\] /, '') || 'Mulai percakapan'}
             </p>
           </div>
           

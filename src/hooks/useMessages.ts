@@ -1,3 +1,4 @@
+import { isActuallyOnline } from '@/lib/presence';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
@@ -203,85 +204,12 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
       const otherId = otherParticipantIds[0];
       const { data: otherProfile } = await supabase
         .from('profiles')
-        .select('is_online')
+        .select('is_online, last_seen')
         .eq('user_id', otherId)
         .single();
 
-      if (otherProfile?.is_online) {
+      if (isActuallyOnline(otherProfile)) {
         await supabase.from('messages').update({ status: 'delivered' }).eq('id', data.id);
-      }
-    }
-
-    // Send push notification to other participants
-    if (data && !error && otherParticipantIds.length > 0) {
-      try {
-        const { data: senderProfile } = await supabase
-          .from('profiles')
-          .select('name')
-          .eq('user_id', userId)
-          .single();
-
-        const senderName = senderProfile?.name || 'Pesan baru';
-
-        // Check for @mentions and send targeted notifications
-        const mentionRegex = /@(\S+)/g;
-        let match;
-        const mentionedNames: string[] = [];
-        while ((match = mentionRegex.exec(content)) !== null) {
-          mentionedNames.push(match[1]);
-        }
-
-        if (mentionedNames.length > 0) {
-          // Find user IDs of mentioned users
-          const { data: mentionedProfiles } = await supabase
-            .from('profiles')
-            .select('user_id, name')
-            .in('name', mentionedNames);
-
-          if (mentionedProfiles && mentionedProfiles.length > 0) {
-            const mentionedUserIds = mentionedProfiles.map(p => p.user_id).filter(id => id !== userId);
-            if (mentionedUserIds.length > 0) {
-              await supabase.functions.invoke('send-push-notification', {
-                body: {
-                  userIds: mentionedUserIds,
-                  title: `@ ${senderName} menyebutmu`,
-                  body: content.length > 80 ? content.substring(0, 80) + '...' : content,
-                  data: { chatId, messageId: data.id, type: 'mention' },
-                  tag: `mention-${chatId}`,
-                },
-              });
-            }
-          }
-        }
-
-        // General notification to all other participants
-        const title = senderName;
-        let body = content;
-        if (type === 'image') body = '📷 Foto';
-        else if (type === 'video') body = '🎥 Video';
-        else if (type === 'voice') body = '🎤 Pesan suara';
-        else if (type === 'file') body = '📄 Dokumen';
-        else if (type === 'poll') body = '📊 Poll';
-
-        // Exclude mentioned users from general notification to avoid duplicate
-        const mentionedIds = mentionedNames.length > 0
-          ? (await supabase.from('profiles').select('user_id').in('name', mentionedNames)).data?.map(p => p.user_id) || []
-          : [];
-        const generalRecipients = otherParticipantIds.filter(id => !mentionedIds.includes(id));
-
-        if (generalRecipients.length > 0) {
-          await supabase.functions.invoke('send-push-notification', {
-            body: {
-              userIds: generalRecipients,
-              title,
-              body,
-              data: { chatId, messageId: data.id },
-              tag: `chat-${chatId}`,
-            },
-          });
-        }
-      } catch (e) {
-        console.error('[Push] Failed to send notification:', e);
       }
     }
 

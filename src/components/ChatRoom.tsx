@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { isActuallyOnline } from '@/lib/presence';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -39,7 +41,6 @@ import { GroupChannelInfo } from '@/components/GroupChannelInfo';
 import { SearchMessagesSheet } from '@/components/SearchMessagesSheet';
 import { ReportMessageModal } from '@/components/ReportMessageModal';
 import { LocationShare } from '@/components/LocationShare';
-import { MentionPicker } from '@/components/MentionPicker';
 import { toast } from 'sonner';
 import type { ChatWithDetails } from '@/hooks/useChats';
 
@@ -47,8 +48,8 @@ interface ChatRoomProps {
   chat: ChatWithDetails;
   userId: string;
   onBack: () => void;
-  onCall: (targetUserId: string) => void;
-  onVideoCall: (targetUserId: string) => void;
+  onCall: () => void;
+  onVideoCall: () => void;
   onInfo: () => void;
   onChatWithUser?: (userId: string) => void;
 }
@@ -86,8 +87,6 @@ export function ChatRoom({
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
   const [chatWallpaper, setChatWallpaper] = useState<string | null>(null);
   const [showLocationShare, setShowLocationShare] = useState(false);
-  const [showMentionPicker, setShowMentionPicker] = useState(false);
-  const [mentionFilter, setMentionFilter] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -100,31 +99,8 @@ export function ChatRoom({
   }, [messages]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setInputValue(val);
+    setInputValue(e.target.value);
     setTyping(true);
-
-    // Check for @ mention in group chats
-    if ((chat.type === 'group') && val.includes('@')) {
-      const lastAtIndex = val.lastIndexOf('@');
-      const afterAt = val.substring(lastAtIndex + 1);
-      // Only show if @ is at end or followed by text without space
-      if (!afterAt.includes(' ')) {
-        setMentionFilter(afterAt);
-        setShowMentionPicker(true);
-      } else {
-        setShowMentionPicker(false);
-      }
-    } else {
-      setShowMentionPicker(false);
-    }
-  };
-
-  const handleMentionSelect = (member: { user_id: string; name: string }) => {
-    const lastAtIndex = inputValue.lastIndexOf('@');
-    const newValue = inputValue.substring(0, lastAtIndex) + `@${member.name} `;
-    setInputValue(newValue);
-    setShowMentionPicker(false);
   };
 
   const handleSend = async () => {
@@ -554,9 +530,9 @@ export function ChatRoom({
   };
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="flex-shrink-0 z-30 bg-background-secondary/95 backdrop-blur-xl border-b border-border/50">
+      <header className="sticky top-0 z-30 bg-background-secondary/95 backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center gap-3 p-3">
           <Button variant="ghost" size="icon-sm" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
@@ -574,15 +550,15 @@ export function ChatRoom({
                 <h2 className="font-display font-semibold text-foreground">
                   {chat.name}
                 </h2>
-                {isOfficial && (
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                {(isOfficial || (chat.type === 'private' && otherUserProfile?.is_verified)) && (
+                  <VerifiedBadge />
                 )}
               </div>
               <p className="text-xs text-primary">
                 {typingUsers.length > 0 
                   ? `${typingUsers[0]?.name || 'Seseorang'} sedang mengetik...`
                   : chat.type === 'private' 
-                    ? (otherUserProfile?.is_online 
+                    ? (isActuallyOnline(otherUserProfile) 
                         ? 'Online' 
                         : `Terakhir dilihat ${formatLastSeen(otherUserProfile?.last_seen)}`)
                     : chat.type === 'channel'
@@ -597,10 +573,10 @@ export function ChatRoom({
             <Button variant="ghost" size="icon-sm" onClick={() => setShowSearch(true)}>
               <Search className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => onVideoCall(otherUserProfile?.user_id || '')}>
+            <Button variant="ghost" size="icon-sm" onClick={onVideoCall}>
               <Video className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => onCall(otherUserProfile?.user_id || '')}>
+            <Button variant="ghost" size="icon-sm" onClick={onCall}>
               <Phone className="w-5 h-5" />
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={() => setShowChatOptions(true)}>
@@ -612,7 +588,7 @@ export function ChatRoom({
 
       {/* Messages */}
       <main 
-        className={`flex-1 min-h-0 overflow-y-auto p-4 space-y-4 ${getWallpaperClass()}`}
+        className={`flex-1 overflow-y-auto p-4 space-y-4 ${getWallpaperClass()}`}
         style={getWallpaperStyle()}
       >
         {loading ? (
@@ -626,6 +602,16 @@ export function ChatRoom({
         ) : (
           messages.map((message) => {
             const isMe = message.sender_id === userId;
+
+            if (!message.sender_id || message.content?.startsWith('[system] ')) {
+              return (
+                <div key={message.id} className="flex justify-center my-2">
+                  <span className="px-3 py-1 rounded-full bg-muted/70 text-muted-foreground text-xs text-center max-w-[85%]">
+                    {(message.content || '').replace(/^\[system\] /, '')}
+                  </span>
+                </div>
+              );
+            }
 
             return (
               <SwipeableMessage
@@ -749,7 +735,7 @@ export function ChatRoom({
 
       {/* Input Bar */}
       {canSendMessage ? (
-        <footer className="flex-shrink-0 bg-background-secondary/95 backdrop-blur-xl border-t border-border/50 p-3">
+        <footer className="sticky bottom-0 bg-background-secondary/95 backdrop-blur-xl border-t border-border/50 p-3">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => setShowMediaUpload(true)}>
               <Paperclip className="w-5 h-5" />
@@ -762,14 +748,6 @@ export function ChatRoom({
             </Button>
 
             <div className="flex-1 relative">
-              {/* @ Mention Picker */}
-              <MentionPicker
-                isOpen={showMentionPicker}
-                chatId={chat.id}
-                filter={mentionFilter}
-                onSelect={handleMentionSelect}
-                onClose={() => setShowMentionPicker(false)}
-              />
               <input
                 type="text"
                 placeholder="Ketik pesan..."
@@ -1016,9 +994,9 @@ export function ChatRoom({
           onClose={() => setShowProfileView(false)}
           profile={otherUserProfile}
           isBlocked={isBlocked(otherUserProfile.user_id)}
-          isOfficial={chat.is_official || false}
-          onCall={() => onCall(otherUserProfile.user_id)}
-          onVideoCall={() => onVideoCall(otherUserProfile.user_id)}
+          isOfficial={chat.is_official || !!otherUserProfile?.is_verified}
+          onCall={onCall}
+          onVideoCall={onVideoCall}
           onBlock={handleBlock}
           onReport={() => {
             setShowProfileView(false);

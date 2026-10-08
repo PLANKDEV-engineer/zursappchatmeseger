@@ -1,85 +1,54 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export function usePresence(userId: string | undefined) {
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+const HEARTBEAT_MS = 30_000;
 
-  // Update own online status
+/**
+ * Honest presence: the user is "online" only while the app is open and visible.
+ * A heartbeat refreshes last_seen every 30s; viewers treat stale heartbeats as offline
+ * (see isActuallyOnline), so a killed app / lost connection shows offline automatically.
+ */
+export function usePresence(userId: string | undefined) {
   const setOnline = useCallback(async (isOnline: boolean) => {
     if (!userId) return;
-    
     await supabase
       .from('profiles')
-      .update({ 
-        is_online: isOnline,
-        last_seen: new Date().toISOString()
-      })
+      .update({ is_online: isOnline, last_seen: new Date().toISOString() })
       .eq('user_id', userId);
   }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
-    // Set online when component mounts
-    setOnline(true);
-
-    // Subscribe to presence changes
-    const channel = supabase
-      .channel('online-users')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: 'is_online=eq.true'
-        },
-        (payload) => {
-          if (payload.new.is_online) {
-            setOnlineUsers(prev => new Set(prev).add(payload.new.user_id));
-          } else {
-            setOnlineUsers(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(payload.new.user_id);
-              return newSet;
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    // Set offline when window closes
-    const handleBeforeUnload = () => {
+    const start = () => {
+      if (timer) return;
+      setOnline(true);
+      timer = setInterval(() => {
+        if (document.visibilityState === 'visible' && navigator.onLine) setOnline(true);
+      }, HEARTBEAT_MS);
+    };
+    const stop = () => {
+      if (timer) { clearInterval(timer); timer = null; }
       setOnline(false);
     };
 
-    // Set offline when visibility changes
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setOnline(false);
-      } else {
-        setOnline(true);
-      }
-    };
+    const onVisibility = () => (document.visibilityState === 'visible' ? start() : stop());
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    if (document.visibilityState === 'visible') start();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', stop);
+    window.addEventListener('offline', stop);
+    window.addEventListener('online', start);
 
     return () => {
-      setOnline(false);
-      supabase.removeChannel(channel);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', stop);
+      window.removeEventListener('offline', stop);
+      window.removeEventListener('online', start);
+      stop();
     };
   }, [userId, setOnline]);
 
-  const isUserOnline = useCallback((checkUserId: string) => {
-    return onlineUsers.has(checkUserId);
-  }, [onlineUsers]);
-
-  return {
-    setOnline,
-    isUserOnline,
-    onlineUsers,
-  };
+  return { setOnline };
 }

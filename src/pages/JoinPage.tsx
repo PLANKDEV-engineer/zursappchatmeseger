@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Radio, ArrowLeft, UserPlus, Check, Loader2, XCircle, Ban } from 'lucide-react';
@@ -45,39 +46,22 @@ export default function JoinPage() {
     if (!chatId) return;
     
     try {
-      // Try by exact ID first
-      let { data: chat } = await supabase
+      // First try to find by exact ID
+      let { data: chat, error: chatError } = await supabase
         .from('chats')
         .select('*')
         .eq('id', chatId)
-        .in('type', ['group', 'channel'])
         .maybeSingle();
 
-      // If not found by ID, try matching invite_link field
+      // If not found by ID, try by invite_link
       if (!chat) {
         const { data: chatByLink } = await supabase
           .from('chats')
           .select('*')
-          .in('type', ['group', 'channel'])
-          .not('invite_link', 'is', null)
+          .ilike('invite_link', `%${chatId}%`)
           .maybeSingle();
         
-        // Manual match since ilike may not work well with encoded URLs
-        if (!chatByLink) {
-          // Try broader search
-          const { data: allGroupChats } = await supabase
-            .from('chats')
-            .select('*')
-            .in('type', ['group', 'channel'])
-            .not('invite_link', 'is', null);
-          
-          chat = allGroupChats?.find(c => 
-            c.invite_link?.includes(chatId) || 
-            c.invite_link === chatId
-          ) || null;
-        } else {
-          chat = chatByLink.invite_link?.includes(chatId) ? chatByLink : null;
-        }
+        chat = chatByLink;
       }
 
       if (!chat) {
@@ -161,17 +145,7 @@ export default function JoinPage() {
           .eq('id', chatInfo.id);
       }
 
-      // Send system message for group join
-      if (chatInfo.type === 'group') {
-        await supabase
-          .from('messages')
-          .insert({
-            chat_id: chatInfo.id,
-            sender_id: user.id,
-            content: `${profile.name} telah bergabung ke grup menggunakan link tautan`,
-            type: 'text',
-          });
-      }
+      // Group join notice is posted automatically by the group itself.
 
       toast.success(
         chatInfo.type === 'channel' 
@@ -285,7 +259,7 @@ export default function JoinPage() {
               {chatInfo.name}
             </h1>
             {chatInfo.is_official && (
-              <Check className="w-5 h-5 text-primary" />
+              <VerifiedBadge className="w-5 h-5" />
             )}
           </div>
 
@@ -316,7 +290,7 @@ export default function JoinPage() {
             <p className="text-center text-muted-foreground text-sm mb-4">
               Login untuk {chatInfo.type === 'channel' ? 'mengikuti saluran' : 'bergabung ke grup'}
             </p>
-            <Button onClick={() => navigate(`/?redirect=/join/${chatId}`)} className="w-full">
+            <Button onClick={() => navigate('/')} className="w-full">
               Login / Daftar
             </Button>
           </div>

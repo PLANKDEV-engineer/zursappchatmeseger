@@ -1,5 +1,6 @@
+import { isActuallyOnline } from '@/lib/presence';
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -58,7 +59,6 @@ export function GroupChannelInfo({
   userId,
   onChatWithUser,
 }: GroupChannelInfoProps) {
-  const { isAdmin: isAppAdmin } = useAuth();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserParticipant, setCurrentUserParticipant] = useState<Participant | null>(null);
@@ -97,7 +97,7 @@ export function GroupChannelInfo({
         for (const p of participantsData || []) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('name, phone, avatar_url, is_online, public_id')
+            .select('name, phone, avatar_url, is_online, last_seen, public_id, is_verified')
             .eq('user_id', p.user_id)
             .maybeSingle();
 
@@ -131,17 +131,9 @@ export function GroupChannelInfo({
   };
 
   const copyInviteLink = async () => {
+    // Use current origin for the invite link so it works in any environment
     const origin = window.location.origin;
     const link = chat.invite_link || `${origin}/join/${chat.id}`;
-    
-    // Save invite link to DB if not already saved
-    if (!chat.invite_link) {
-      await supabase
-        .from('chats')
-        .update({ invite_link: link })
-        .eq('id', chat.id);
-    }
-    
     await navigator.clipboard.writeText(link);
     setLinkCopied(true);
     toast.success('Link berhasil disalin!');
@@ -263,7 +255,7 @@ export function GroupChannelInfo({
     }
   };
 
-  const isUserAdmin = currentUserParticipant?.is_admin || currentUserParticipant?.is_owner || isAppAdmin;
+  const isUserAdmin = currentUserParticipant?.is_admin || currentUserParticipant?.is_owner;
 
   return (
     <AnimatePresence>
@@ -296,7 +288,7 @@ export function GroupChannelInfo({
             />
             <div className="flex items-center gap-2 mt-4">
               <h2 className="text-xl font-display font-bold">{chatData.name}</h2>
-              {isOfficial && <CheckCircle2 className="w-5 h-5 text-primary" />}
+              {isOfficial && <VerifiedBadge className="w-5 h-5" />}
             </div>
             <p className="text-primary text-sm mt-1">
               {isChannel 
@@ -448,7 +440,7 @@ export function GroupChannelInfo({
                           src={participant.profile?.avatar_url || undefined}
                           name={participant.profile?.name}
                           size="sm"
-                          showStatus={participant.profile?.is_online}
+                          showStatus={isActuallyOnline(participant.profile as any)}
                         />
                       </button>
                       <div className="flex-1 min-w-0">

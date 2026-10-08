@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Radio, Phone, Settings, Shield } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { ChatProvider } from '@/context/ChatContext';
 import { AuthPage } from '@/pages/AuthPage';
 import { ChatDashboard } from '@/components/ChatDashboard';
@@ -22,7 +20,6 @@ import { BottomNav } from '@/components/BottomNav';
 import { BlockedScreen } from '@/components/BlockedScreen';
 import { CameraPage } from '@/components/CameraPage';
 import { NotificationPrompt } from '@/components/NotificationPrompt';
-import { InviteToCallModal } from '@/components/InviteToCallModal';
 import { Toaster } from '@/components/ui/toaster';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +28,6 @@ import { useStatuses, type StatusType } from '@/hooks/useStatuses';
 import { useCalls } from '@/hooks/useCalls';
 import { usePresence } from '@/hooks/usePresence';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { useWebRTC } from '@/hooks/useWebRTC';
 
 type View = 'chats' | 'status' | 'calls' | 'settings' | 'admin' | 'chatroom';
 
@@ -50,26 +46,13 @@ function LoadingScreen() {
 function AppContent() {
   const { user, profile, loading, isAdmin, isBlocked, blockInfo } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { chats, fetchChats, createPrivateChat, createGroupChat } = useChats(user?.id);
   const { myStatuses, contactStatuses, createStatus, viewStatus } = useStatuses(user?.id);
   const { initiateCall, endCall, activeCall } = useCalls(user?.id);
   const { registerServiceWorker, isSubscribed: isPushSubscribed } = usePushNotifications(user?.id);
-  const webRTC = useWebRTC(user?.id);
   
   // Initialize presence tracking
   usePresence(user?.id);
-
-  // Handle redirect after login
-  useEffect(() => {
-    if (user && !loading) {
-      const redirect = searchParams.get('redirect');
-      if (redirect) {
-        navigate(redirect, { replace: true });
-      }
-    }
-  }, [user, loading, searchParams, navigate]);
 
   // Register service worker on mount
   useEffect(() => {
@@ -91,9 +74,8 @@ function AppContent() {
   const [showCameraPage, setShowCameraPage] = useState(false);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [settingsInitialView, setSettingsInitialView] = useState<'main' | 'archived'>('main');
-  const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string; targetUserId?: string } | null>(null);
+  const [callInfo, setCallInfo] = useState<{ type: 'voice' | 'video'; name: string; avatar?: string } | null>(null);
   const [[page, direction], setPage] = useState([0, 0]);
-  const [showInviteToCall, setShowInviteToCall] = useState(false);
 
   // Show notification prompt after first login if not subscribed
   useEffect(() => {
@@ -127,17 +109,6 @@ function AppContent() {
   useEffect(() => {
     setPage([activeNavIndex, activeNavIndex > page ? 1 : -1]);
   }, [activeNavIndex, page]);
-
-  // Handle incoming calls
-  useEffect(() => {
-    if (webRTC.incomingCall) {
-      setCallInfo({
-        type: webRTC.incomingCall.callType,
-        name: webRTC.incomingCall.callerName,
-      });
-      setShowCallScreen(true);
-    }
-  }, [webRTC.incomingCall]);
 
   // Early returns AFTER all hooks
   if (loading) {
@@ -249,44 +220,24 @@ function AppContent() {
   };
 
   const handleCall = async (receiverId: string, type: 'voice' | 'video') => {
-    if (!receiverId) {
-      // For group chats, get the other user
-      return;
-    }
-    try {
-      // Get receiver profile
-      const { data: receiverProfile } = await supabase
-        .from('profiles')
-        .select('name, avatar_url')
-        .eq('user_id', receiverId)
-        .single();
-
+    const { data } = await initiateCall(receiverId, type);
+    if (data) {
       setCallInfo({
         type,
-        name: receiverProfile?.name || 'Unknown',
-        avatar: receiverProfile?.avatar_url || undefined,
-        targetUserId: receiverId,
+        name: data.receiverProfile?.name || 'Unknown',
+        avatar: data.receiverProfile?.avatar_url || undefined,
       });
       setShowCallScreen(true);
-      
-      await webRTC.startCall(receiverId, type);
-    } catch (err: any) {
-      console.error('Call failed:', err);
-      setShowCallScreen(false);
-      setCallInfo(null);
     }
-  };
-
-  const handleAnswerCall = async () => {
-    await webRTC.answerCall();
   };
 
   const handleEndCall = async () => {
-    webRTC.endCall();
+    if (activeCall) {
+      await endCall(activeCall.id);
+    }
     setShowCallScreen(false);
     setCallInfo(null);
   };
-
 
   // Slide variants for page transitions
   const slideVariants = {
@@ -361,8 +312,8 @@ function AppContent() {
           chat={selectedChat}
           userId={user.id}
           onBack={handleBackFromChat}
-          onCall={(targetUserId) => handleCall(targetUserId, 'voice')}
-          onVideoCall={(targetUserId) => handleCall(targetUserId, 'video')}
+          onCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'voice')}
+          onVideoCall={() => handleCall(selectedChat.participants?.[0]?.user_id || '', 'video')}
           onInfo={() => {}}
           onChatWithUser={handleCreateChat}
         />
@@ -443,20 +394,7 @@ function AppContent() {
           callType={callInfo.type}
           callerName={callInfo.name}
           callerAvatar={callInfo.avatar}
-          isIncoming={!!webRTC.incomingCall}
-          onAnswer={handleAnswerCall}
-          onDecline={handleEndCall}
           onEndCall={handleEndCall}
-          localStream={webRTC.localStream}
-          remoteStream={webRTC.remoteStream}
-          callState={webRTC.callState}
-          callDuration={webRTC.callDuration}
-          isMuted={webRTC.isMuted}
-          isVideoOff={webRTC.isVideoOff}
-          onToggleMute={webRTC.toggleMute}
-          onToggleVideo={webRTC.toggleVideo}
-          onSwitchCamera={webRTC.switchCamera}
-          onInviteToCall={() => setShowInviteToCall(true)}
         />
       )}
 
@@ -480,35 +418,6 @@ function AppContent() {
         userId={user.id}
         isOpen={showNotificationPrompt}
         onClose={() => setShowNotificationPrompt(false)}
-      />
-
-      {/* Invite to Call Modal */}
-      <InviteToCallModal
-        isOpen={showInviteToCall}
-        onClose={() => setShowInviteToCall(false)}
-        userId={user.id}
-        onInvite={async (targetUserId) => {
-          // Send push notification to invite user to call
-          try {
-            const { data: senderProfile } = await supabase
-              .from('profiles')
-              .select('name')
-              .eq('user_id', user.id)
-              .single();
-            
-            await supabase.functions.invoke('send-push-notification', {
-              body: {
-                userIds: [targetUserId],
-                title: '📞 Undangan Panggilan',
-                body: `${senderProfile?.name || 'Seseorang'} mengundang Anda ke panggilan`,
-                data: { type: 'call_invite', callerId: user.id },
-                tag: 'call-invite',
-              },
-            });
-          } catch (e) {
-            console.error('Failed to send call invite:', e);
-          }
-        }}
       />
     </div>
   );
