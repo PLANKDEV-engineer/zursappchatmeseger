@@ -538,6 +538,7 @@ export type Database = {
           description: string | null
           id: string
           is_online: boolean | null
+          is_verified: boolean
           last_seen: string | null
           name: string
           phone: string | null
@@ -552,6 +553,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_online?: boolean | null
+          is_verified?: boolean
           last_seen?: string | null
           name: string
           phone?: string | null
@@ -566,6 +568,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_online?: boolean | null
+          is_verified?: boolean
           last_seen?: string | null
           name?: string
           phone?: string | null
