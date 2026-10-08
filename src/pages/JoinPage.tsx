@@ -145,17 +145,7 @@ export default function JoinPage() {
           .eq('id', chatInfo.id);
       }
 
-      // Send system message for group join
-      if (chatInfo.type === 'group') {
-        await supabase
-          .from('messages')
-          .insert({
-            chat_id: chatInfo.id,
-            sender_id: null,
-            content: `[system] ${profile.name} bergabung ke grup menggunakan tautan undangan`,
-            type: 'text',
-          });
-      }
+      // Group join notice is posted automatically by the group itself.
 
       toast.success(
         chatInfo.type === 'channel' 
