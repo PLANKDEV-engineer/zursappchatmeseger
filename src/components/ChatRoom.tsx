@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { isActuallyOnline } from '@/lib/presence';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -549,7 +550,7 @@ export function ChatRoom({
                 <h2 className="font-display font-semibold text-foreground">
                   {chat.name}
                 </h2>
-                {isOfficial && (
+                {(isOfficial || (chat.type === 'private' && otherUserProfile?.is_verified)) && (
                   <VerifiedBadge />
                 )}
               </div>
@@ -557,7 +558,7 @@ export function ChatRoom({
                 {typingUsers.length > 0 
                   ? `${typingUsers[0]?.name || 'Seseorang'} sedang mengetik...`
                   : chat.type === 'private' 
-                    ? (otherUserProfile?.is_online 
+                    ? (isActuallyOnline(otherUserProfile) 
                         ? 'Online' 
                         : `Terakhir dilihat ${formatLastSeen(otherUserProfile?.last_seen)}`)
                     : chat.type === 'channel'
@@ -985,7 +986,7 @@ export function ChatRoom({
           onClose={() => setShowProfileView(false)}
           profile={otherUserProfile}
           isBlocked={isBlocked(otherUserProfile.user_id)}
-          isOfficial={chat.is_official || false}
+          isOfficial={chat.is_official || !!otherUserProfile?.is_verified}
           onCall={onCall}
           onVideoCall={onVideoCall}
           onBlock={handleBlock}
