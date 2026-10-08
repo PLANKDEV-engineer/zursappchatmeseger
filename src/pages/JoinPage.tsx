@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Radio, ArrowLeft, UserPlus, Check, Loader2, XCircle, Ban } from 'lucide-react';

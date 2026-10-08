@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -549,7 +550,7 @@ export function ChatRoom({
                   {chat.name}
                 </h2>
                 {isOfficial && (
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <VerifiedBadge />
                 )}
               </div>
               <p className="text-xs text-primary">

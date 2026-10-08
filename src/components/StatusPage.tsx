@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Eye, Radio, Users, CheckCircle2, Search, X } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
@@ -190,8 +191,8 @@ export function StatusPage({
                         </div>
                       </div>
                       {channel.is_official && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center border-2 border-background">
-                          <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                        <div className="absolute -bottom-1 -right-1">
+                          <VerifiedBadge className="w-5 h-5" />
                         </div>
                       )}
                     </div>
@@ -201,7 +202,7 @@ export function StatusPage({
                           {channel.name}
                         </h3>
                         {channel.is_official && (
-                          <CheckCircle2 className="w-4 h-4 text-primary" />
+                          <VerifiedBadge />
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -348,8 +349,8 @@ export function StatusPage({
                       </div>
                     </div>
                     {channel.is_official && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center border-2 border-background">
-                        <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                      <div className="absolute -bottom-1 -right-1">
+                        <VerifiedBadge className="w-5 h-5" />
                       </div>
                     )}
                   </div>
@@ -359,7 +360,7 @@ export function StatusPage({
                         {channel.name}
                       </h3>
                       {channel.is_official && (
-                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                        <VerifiedBadge />
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">

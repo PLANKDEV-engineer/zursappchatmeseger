@@ -1,4 +1,5 @@
 import React from 'react';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, 
@@ -96,8 +97,8 @@ export function ProfileView({
                   showStatus
                 />
                 {isOfficial && (
-                  <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                    <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
+                  <div className="absolute -bottom-1 -right-1">
+                    <VerifiedBadge className="w-8 h-8" />
                   </div>
                 )}
               </div>
@@ -107,7 +108,7 @@ export function ProfileView({
                   {profile.name}
                 </h2>
                 {isOfficial && (
-                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                  <VerifiedBadge className="w-5 h-5" />
                 )}
               </div>
               
