@@ -1,3 +1,4 @@
+import { isActuallyOnline } from '@/lib/presence';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Search, Shield, Users, AlertTriangle, Ban, CheckCircle, XCircle, Eye, MessageSquare, Radio } from 'lucide-react';
@@ -228,7 +229,7 @@ export function AdminPanel({ userId, onBack }: AdminPanelProps) {
                         src={user.avatar_url || undefined}
                         name={user.name}
                         size="md"
-                        isOnline={user.is_online}
+                        isOnline={isActuallyOnline(user as any)}
                         showStatus
                       />
                       {user.isBlocked && (

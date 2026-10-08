@@ -1,3 +1,4 @@
+import { isActuallyOnline } from '@/lib/presence';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, UserPlus, MessageCircle, Copy, Check, Info } from 'lucide-react';
@@ -346,7 +347,7 @@ export function AddContactModal({ isOpen, onClose, userId, onCreateChat }: AddCo
                             src={contact.profile?.avatar_url || undefined}
                             name={contact.name}
                             size="md"
-                            isOnline={contact.profile?.is_online}
+                            isOnline={isActuallyOnline(contact.profile as any)}
                             showStatus={!!contact.contact_user_id}
                           />
                         </button>

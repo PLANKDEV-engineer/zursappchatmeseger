@@ -1,3 +1,4 @@
+import { isActuallyOnline } from '@/lib/presence';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
@@ -203,11 +204,11 @@ export function useMessages(chatId: string | undefined, userId: string | undefin
       const otherId = otherParticipantIds[0];
       const { data: otherProfile } = await supabase
         .from('profiles')
-        .select('is_online')
+        .select('is_online, last_seen')
         .eq('user_id', otherId)
         .single();
 
-      if (otherProfile?.is_online) {
+      if (isActuallyOnline(otherProfile)) {
         await supabase.from('messages').update({ status: 'delivered' }).eq('id', data.id);
       }
     }

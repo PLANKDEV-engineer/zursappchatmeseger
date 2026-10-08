@@ -1,3 +1,4 @@
+import { isActuallyOnline } from '@/lib/presence';
 import React, { useState, useEffect } from 'react';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -96,7 +97,7 @@ export function GroupChannelInfo({
         for (const p of participantsData || []) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('name, phone, avatar_url, is_online, public_id')
+            .select('name, phone, avatar_url, is_online, last_seen, public_id, is_verified')
             .eq('user_id', p.user_id)
             .maybeSingle();
 
@@ -439,7 +440,7 @@ export function GroupChannelInfo({
                           src={participant.profile?.avatar_url || undefined}
                           name={participant.profile?.name}
                           size="sm"
-                          showStatus={participant.profile?.is_online}
+                          showStatus={isActuallyOnline(participant.profile as any)}
                         />
                       </button>
                       <div className="flex-1 min-w-0">

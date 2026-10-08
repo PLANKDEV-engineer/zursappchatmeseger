@@ -1,3 +1,4 @@
+import { isActuallyOnline } from '@/lib/presence';
 import React from 'react';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -93,7 +94,7 @@ export function ProfileView({
                   src={profile.avatar_url || undefined}
                   name={profile.name}
                   size="xl"
-                  isOnline={profile.is_online}
+                  isOnline={isActuallyOnline(profile)}
                   showStatus
                 />
                 {isOfficial && (
@@ -113,7 +114,7 @@ export function ProfileView({
               </div>
               
               <p className="text-sm text-muted-foreground mt-1">
-                {profile.is_online ? (
+                {isActuallyOnline(profile) ? (
                   <span className="text-primary">Online</span>
                 ) : (
                   `Terakhir dilihat ${formatLastSeen(profile.last_seen)}`
