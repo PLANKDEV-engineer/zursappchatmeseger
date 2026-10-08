@@ -269,7 +269,7 @@ export default function JoinPage() {
               {chatInfo.name}
             </h1>
             {chatInfo.is_official && (
-              <Check className="w-5 h-5 text-primary" />
+              <VerifiedBadge className="w-5 h-5" />
             )}
           </div>
 
